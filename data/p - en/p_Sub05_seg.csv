@@ -1,0 +1,11 @@
+Start,End,Label
+0,13000,Story begins
+13000,22000,Boy playing video games
+22000,54000,Mother appearing
+54000,70000,Unwrapping the gift
+70000,98000,Disliking/rejecting the puppy
+98000,133000,Puppy playing around
+133000,155000,Feeling happy
+155000,175000,Inviting to play together
+175000,187000,Boy being disabled
+187000,208000,Going out to play together

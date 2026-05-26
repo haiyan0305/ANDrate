@@ -1,0 +1,15 @@
+Start,End,Label
+0,8000,Intro scene of the boy playing video games
+8000,22000,Boy playing video games at home
+22000,36000,Mother carrying things into the house
+36000,50000,Mother opening the curtains and asking the boy to open the cardboard box
+50000,58000,Boy opening the cardboard box
+58000,78000,"Happy to see a puppy inside the box, but noticing it is missing a leg"
+78000,88000,"Discovering the puppy is imperfect, the boy throws a tantrum"
+88000,97000,Puppy finding a small ball and wanting to play
+97000,122000,Puppy wanting the boy to play with it using the small ball
+122000,138000,Boy keeping an eye on what the puppy is doing
+138000,154000,Puppy trying to run toward the boy with the small ball
+154000,173000,Boy watching the puppy while having an internal struggle
+173000,192000,"Boy standing up, intending to take the puppy outside to play"
+192000,205000,Puppy and the boy playing with the ball in the yard

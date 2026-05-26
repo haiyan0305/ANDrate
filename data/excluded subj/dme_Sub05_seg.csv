@@ -1,0 +1,14 @@
+﻿Start,End,Label
+0,22000,Story begins
+22000,56000,Making requests
+56000,164000,Starting to tell a story
+164000,213000,"Story ends, falling asleep"
+213000,267000,New story begins
+267000,287000,Conflict arises
+287000,339000,Funny moment
+339000,406000,Three girls being picked up
+406000,457000,Sad and reluctant to part
+457000,534000,Rocket
+534000,557000,Rocket launch
+557000,597000,New character
+597000,600000,Story ends

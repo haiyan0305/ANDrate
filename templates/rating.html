@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>ANDrate | Continuous Rating</title>
+    <script src="/webgazer.js"></script>
+    <style>
+        :root {
+            --bg-color: #F5F5F7; --card-bg: #FFFFFF; --accent-color: #0071E3;
+            --text-main: #1D1D1F; --text-sub: #86868B; --border-radius: 18px;
+            --chart-val: #0071E3; --chart-aro: #FF3B30;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; }
+        .btn-back { text-decoration: none; color: var(--accent-color); font-weight: 500; font-size: 15px; cursor: pointer; }
+        .btn-export { background: var(--accent-color); color: white; border: none; padding: 6px 15px; border-radius: 8px; cursor: pointer; }
+
+        .main-content { display: flex; flex: 1; gap: 20px; padding: 10px; overflow: hidden; position: relative; }
+
+        .left-section { flex: 8; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+
+        .video-container {
+            background: #000; border-radius: var(--border-radius);
+            flex: 4;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;
+            position: relative;
+        }
+        .video-container.is-audio { min-height: 100px; background: #F5F5F7; }
+        .video-container video { width: 100%; height: 100%; object-fit: contain; }
+        .video-container audio { width: 100%; max-width: 560px; display: none; }
+
+        .chart-card {
+            background: var(--card-bg); border-radius: var(--border-radius); padding: 15px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+            flex: 1; display: flex; flex-direction: column;
+        }
+        .slider-wrapper { margin-bottom: 5px; } input[type="range"] { width: 100%; cursor: pointer; }
+        .chart-wrapper { flex: 1; position: relative; margin-top: 5px; border: 1px solid #E5E5E7; border-radius: 8px; overflow: hidden; background: #FAFAFC; }
+        canvas#lineChart { width: 100%; height: 100%; display: block; }
+        .legend { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 10px; font-weight: 500; color: var(--text-main); }
+        .legend-items { display: flex; gap: 20px; } .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot-val { width: 10px; height: 10px; background: var(--chart-val); border-radius: 50%; } .dot-aro { width: 10px; height: 10px; background: var(--chart-aro); border-radius: 50%; }
+
+        .right-section { flex: 2; display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+
+        .top-panel {
+            flex: 1; background: var(--card-bg); border-radius: var(--border-radius);
+            display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+            padding: 20px; align-items: center; min-height: 0;
+        }
+        .grid-header { font-weight: 600; margin-bottom: 20px; }
+        .grid-container { width: 100%; aspect-ratio: 1/1; position: relative; border: 1px solid #E5E5E7; background: #FAFAFC; border-radius: 8px; cursor: crosshair; }
+        canvas#gridCanvas { width: 100%; height: 100%; display: block; }
+        .values-display { margin-top: 20px; width: 100%; text-align: left; font-size: 14px; color: var(--text-main); line-height: 1.8; font-weight: 500; }
+
+        .webcam-panel {
+            height: 180px; flex-shrink: 0; background: var(--card-bg); border-radius: var(--border-radius);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04); padding: 15px; display: none;
+            flex-direction: row; gap: 15px; box-sizing: border-box; align-items: stretch;
+        }
+        .webcam-wrapper {
+            flex: 3; border: 5px solid #FFCC00;
+            border-radius: 12px; overflow: hidden; position: relative; background: #000;
+            transition: border-color 0.2s;
+        }
+        .webcam-btn-group {
+            display: flex; flex-direction: column; gap: 12px; flex: 2;
+            justify-content: center; align-items: center;
+        }
+        .webcam-btn-group button {
+            width: 100%; background: white; border: 2px solid #1D1D1F; font-weight: 800;
+            padding: 14px 0; border-radius: 10px; cursor: pointer; font-size: 14px;
+            transition: all 0.2s; color: #1D1D1F; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .webcam-btn-group button:hover { background: #F5F5F7; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+        .webcam-btn-group button:active { transform: translateY(0); box-shadow: none; }
+        .webcam-btn-group button.inactive { background: #E8E8ED; color: #86868B; border-color: #86868B; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); }
+
+        #webgazerVideoContainer {
+            position: absolute !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; height: 100% !important; transform: none !important;
+            transition: opacity 0.3s ease;
+        }
+        #webgazerVideoContainer video,
+        #webgazerVideoContainer canvas,
+        #webgazerFaceFeedbackBox {
+            position: absolute !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; height: 100% !important;
+            object-fit: fill !important;
+            margin: 0 !important; padding: 0 !important;
+        }
+        #webgazerGazeDot { transition: opacity 0.2s ease !important; }
+
+        #exitModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+        .modal-card { background: white; padding: 30px; border-radius: 20px; width: 320px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .modal-card h3 { margin-top: 0; font-size: 20px; margin-bottom: 10px; }
+        .modal-card p { font-size: 14px; color: var(--text-sub); margin-bottom: 25px; }
+        .modal-btn { width: 100%; border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+        .btn-save-exit { background: var(--accent-color); color: white; } .btn-save-exit:hover { opacity: 0.9; }
+        .btn-exit-only { background: #FFE5E5; color: #FF3B30; } .btn-exit-only:hover { background: #FFD1D1; }
+        .btn-cancel { background: #F2F2F7; color: var(--text-main); margin-bottom: 0; } .btn-cancel:hover { background: #E5E5EA; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a onclick="showExitModal()" class="btn-back">Back to Configuration</a>
+        <div style="font-weight: 600;">Phase 2: Continuous Rating</div>
+        <button onclick="exportCSV()" class="btn-export">Export Data</button>
+    </div>
+
+    <div class="main-content">
+        <div class="left-section">
+            <div class="video-container" id="mediaContainer">
+                <video id="mainVideo" playsinline></video>
+                <audio id="mainAudio" controls preload="metadata"></audio>
+            </div>
+            <div class="chart-card">
+                <div style="text-align: left; font-size: 13px; margin-bottom: 6px;">
+                    <span id="timeDisplay" style="font-family: 'SF Mono', Consolas, monospace; font-weight: 600; color: var(--text-main);">00:00.00 / 00:00.00</span>
+                </div>
+
+                <div class="slider-wrapper"><input type="range" id="videoSlider" min="0" value="0" step="0.1"></div>
+                <div class="chart-wrapper"><canvas id="lineChart"></canvas></div>
+                <div class="legend">
+                    <div class="legend-items">
+                        <div class="legend-item"><div class="dot-val"></div> <span id="legVal"></span></div>
+                        <div class="legend-item" id="legendAroItem"><div class="dot-aro"></div> <span id="legAro"></span></div>
+                    </div>
+                    <span style="color:var(--text-sub); font-weight: 500;">Space: Play/Pause</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-section">
+            <div class="top-panel">
+                <div class="grid-header">Continuous Rating Space</div>
+                <div class="grid-container"><canvas id="gridCanvas"></canvas></div>
+                <div class="values-display">
+                    <div id="valDisplay">X: 0.00</div>
+                    <div id="aroDisplay">Y: 0.00</div>
+                </div>
+            </div>
+
+            <div class="webcam-panel" id="webcamPanel">
+                <div class="webcam-wrapper" id="webcamWrapper"></div>
+                <div class="webcam-btn-group">
+                    <button id="btnCam" onclick="toggleCam()">Camera</button>
+                    <button id="btnGaze" onclick="toggleGaze()">Gaze Point</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="exitModal">
+        <div class="modal-card">
+            <h3>Save Your Work?</h3>
+            <p>Do you want to save the rating data to the server before returning to the main menu?</p>
+            <button class="modal-btn btn-save-exit" onclick="confirmExit(true)">Save & Exit</button>
+            <button class="modal-btn btn-exit-only" onclick="confirmExit(false)">Exit Without Saving</button>
+            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+
+    <script src="/static/media.js"></script>
+    <script>
+        const mediaContainer = document.getElementById('mediaContainer');
+        const player = ANDrateMedia.createPlayer(
+            document.getElementById('mainVideo'),
+            document.getElementById('mainAudio')
+        );
+        const slider = document.getElementById('videoSlider');
+        const gridCanvas = document.getElementById('gridCanvas'); const chartCanvas = document.getElementById('lineChart');
+        const valDisplay = document.getElementById('valDisplay'); const aroDisplay = document.getElementById('aroDisplay');
+        const webcamWrapper = document.getElementById('webcamWrapper');
+
+        const xName = localStorage.getItem('val_xName') || "Valence"; const yName = localStorage.getItem('val_yName') || "Arousal";
+        const selectedVideo = localStorage.getItem('val_selectedVideo') || "";
+        const saveFolderName = (localStorage.getItem('val_saveFolderName') || "").trim();
+        const xMin = parseFloat(localStorage.getItem('val_xMin')) || -5, xMax = parseFloat(localStorage.getItem('val_xMax')) || 5;
+        const yMin = parseFloat(localStorage.getItem('val_yMin')) || -5, yMax = parseFloat(localStorage.getItem('val_yMax')) || 5;
+        const disableYAxis = localStorage.getItem('val_disableYAxis') === 'true';
+        let useEyeTracking = localStorage.getItem('val_eyeTracking') === 'true';
+
+        document.getElementById('legVal').innerText = xName;
+        document.getElementById('legAro').innerText = yName;
+
+        valDisplay.innerText = `${xName}: 0.00`; aroDisplay.innerText = `${yName}: 0.00`;
+
+        if (disableYAxis) {
+            document.getElementById('legendAroItem').style.display = 'none';
+            aroDisplay.style.display = 'none';
+        }
+
+        let currentV = (xMin + xMax) / 2, currentA = (yMin + yMax) / 2;
+        const configuredSampleRate = parseInt(localStorage.getItem('val_ratingSamplingMs'), 10);
+        const SAMPLE_RATE_MS = Number.isFinite(configuredSampleRate) && configuredSampleRate > 0 ? configuredSampleRate : 200;
+        let ratingData = []; let recordInterval = null;
+        let gazeData = [];
+        let calibrationAccuracy = localStorage.getItem('calibration_accuracy') || "";
+
+        if (selectedVideo) {
+            player.load(selectedVideo);
+            mediaContainer.classList.toggle('is-audio', player.isAudioActive());
+        } else {
+            alert("No target media selected. Choose a video or audio file on the configuration page.");
+        }
+
+        let wgVideoVisible = true;
+        let wgPointVisible = true;
+
+        if (useEyeTracking) {
+            document.getElementById('webcamPanel').style.display = 'flex';
+
+            webgazer.setRegression('ridge')
+                    .setTracker('TFFacemesh')
+                    .saveDataAcrossSessions(true)
+                    .setGazeListener(function(data, elapsedTime) {
+                        if (!data) return;
+
+                        // Get the screen bounds for each tracked area.
+                        const vRect = player.getMediaRect();
+                        const rightSection = document.querySelector('.right-section').getBoundingClientRect();
+                        const chartCard = document.querySelector('.chart-card').getBoundingClientRect();
+                        const gridContainer = document.querySelector('.grid-container').getBoundingClientRect();
+
+                        // Mark which area currently contains the gaze point.
+                        let onVideo = (data.x >= vRect.left && data.x <= vRect.right && data.y >= vRect.top && data.y <= vRect.bottom);
+                        let onFunctionBar = (data.x >= gridContainer.left && data.x <= gridContainer.right && data.y >= gridContainer.top && data.y <= gridContainer.bottom);
+                        let onTimeBar = (data.x >= chartCard.left && data.x <= chartCard.right && data.y >= chartCard.top && data.y <= chartCard.bottom);
+                        let others = !onVideo && !onFunctionBar && !onTimeBar;
+
+                        // Use the webcam border color to show the active gaze area.
+                        if (onVideo) webcamWrapper.style.borderColor = '#34C759';
+                        else if (onFunctionBar) webcamWrapper.style.borderColor = '#0071E3';
+                        else if (onTimeBar) webcamWrapper.style.borderColor = '#FF9500';
+                        else webcamWrapper.style.borderColor = '#FFCC00';
+
+                        if (!player.paused && !player.ended) {
+                            gazeData.push({ ms: player.currentTime * 1000, x: data.x, y: data.y, onVideo: onVideo, onFunctionBar: onFunctionBar, onTimeBar: onTimeBar, others: others });
+                        }
+                    }).begin();
+
+            webgazer.showVideoPreview(true).showPredictionPoints(true);
+
+            const waitWg = setInterval(() => {
+                let wgContainer = document.getElementById('webgazerVideoContainer');
+                if (wgContainer) {
+                    webcamWrapper.appendChild(wgContainer);
+                    clearInterval(waitWg);
+                }
+            }, 100);
+        }
+
+        window.onbeforeunload = function() { if (useEyeTracking) webgazer.end(); }
+
+        function toggleCam() {
+            wgVideoVisible = !wgVideoVisible;
+            let wgContainer = document.getElementById('webgazerVideoContainer');
+            let btn = document.getElementById('btnCam');
+            if (wgContainer) wgContainer.style.opacity = wgVideoVisible ? '1' : '0';
+            btn.classList.toggle('inactive', !wgVideoVisible);
+        }
+
+        function toggleGaze() {
+            wgPointVisible = !wgPointVisible;
+            let dot = document.getElementById('webgazerGazeDot');
+            let btn = document.getElementById('btnGaze');
+            if (dot) dot.style.opacity = wgPointVisible ? '1' : '0';
+            btn.classList.toggle('inactive', !wgPointVisible);
+        }
+
+        function initGrid() {
+            const ctx = gridCanvas.getContext('2d'); const w = gridCanvas.width = gridCanvas.offsetWidth, h = gridCanvas.height = gridCanvas.offsetHeight;
+            let isDragging = false;
+            function updateFromMouse(e) {
+                const rect = gridCanvas.getBoundingClientRect();
+                let mx = Math.max(0, Math.min(e.clientX - rect.left, w)), my = Math.max(0, Math.min(e.clientY - rect.top, h));
+                if (disableYAxis) {
+                    my = h / 2;
+                }
+                currentV = xMin + (mx / w) * (xMax - xMin);
+                currentA = disableYAxis ? ((yMin + yMax) / 2) : (yMin + ((h - my) / h) * (yMax - yMin));
+
+                valDisplay.innerText = `${xName}: ${currentV.toFixed(2)}`;
+                if (!disableYAxis) aroDisplay.innerText = `${yName}: ${currentA.toFixed(2)}`;
+                drawGrid();
+            }
+            gridCanvas.addEventListener('mousedown', (e) => { isDragging = true; updateFromMouse(e); });
+            gridCanvas.addEventListener('mousemove', (e) => { if (isDragging) updateFromMouse(e); });
+            window.addEventListener('mouseup', () => { isDragging = false; }); drawGrid();
+        }
+
+        function drawGrid() {
+            const ctx = gridCanvas.getContext('2d'); const w = gridCanvas.width, h = gridCanvas.height;
+            ctx.clearRect(0, 0, w, h); ctx.strokeStyle = '#D1D1D6'; ctx.lineWidth = 1;
+
+            ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
+            if (!disableYAxis) {
+                ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+            }
+
+            ctx.fillStyle = '#86868B';
+            ctx.font = '12px -apple-system, sans-serif';
+
+            // 在坐标系中显示当前轴名称。
+            ctx.textAlign = 'right';
+            ctx.fillText(xName, w - 5, h / 2 - 8);
+            if (!disableYAxis) {
+                ctx.textAlign = 'left';
+                ctx.fillText(yName, w / 2 + 8, 15);
+            }
+
+            // 绘制坐标轴的最小值和最大值。
+            ctx.font = '11px -apple-system, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(xMin, 5, h / 2 + 14);
+            ctx.textAlign = 'right';
+            ctx.fillText(xMax, w - 5, h / 2 + 14);
+            if (!disableYAxis) {
+                ctx.textAlign = 'center';
+                ctx.fillText(yMax, w / 2 - 14, 12);
+                ctx.fillText(yMin, w / 2 - 14, h - 5);
+            }
+
+            let px = ((currentV - xMin) / (xMax - xMin)) * w, py = h - ((currentA - yMin) / (yMax - yMin)) * h;
+            ctx.fillStyle = '#0071E3'; ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawChart() {
+            const ctx = chartCanvas.getContext('2d'); const w = chartCanvas.width = chartCanvas.offsetWidth, h = chartCanvas.height = chartCanvas.offsetHeight;
+            const dur = player.duration * 1000 || 1; ctx.clearRect(0, 0, w, h); ctx.strokeStyle = '#E5E5E7'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+            if (ratingData.length > 0) {
+                ctx.strokeStyle = '#0071E3'; ctx.lineWidth = 2; ctx.beginPath();
+                ratingData.forEach((d, i) => { let x = (d.timeMs / dur) * w, y = h - ((d.v - xMin) / (xMax - xMin)) * h; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }); ctx.stroke();
+                if (!disableYAxis) {
+                    ctx.strokeStyle = '#FF3B30'; ctx.lineWidth = 2; ctx.beginPath();
+                    ratingData.forEach((d, i) => { let x = (d.timeMs / dur) * w, y = h - ((d.a - yMin) / (yMax - yMin)) * h; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }); ctx.stroke();
+                }
+            }
+            let curX = (player.currentTime * 1000 / dur) * w; ctx.strokeStyle = '#1D1D1F'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(curX, 0); ctx.lineTo(curX, h); ctx.stroke();
+        }
+
+        function startRecording() {
+            if (recordInterval) return;
+            recordInterval = setInterval(() => {
+                let ms = Math.floor(player.currentTime * 1000), alignedMs = Math.round(ms / SAMPLE_RATE_MS) * SAMPLE_RATE_MS;
+                let existing = ratingData.find(d => d.timeMs === alignedMs);
+                if (existing) { existing.v = currentV; existing.a = currentA; } else { ratingData.push({ timeMs: alignedMs, v: currentV, a: currentA }); ratingData.sort((a, b) => a.timeMs - b.timeMs); }
+            }, SAMPLE_RATE_MS / 2);
+        }
+        function stopRecording() { clearInterval(recordInterval); recordInterval = null; }
+
+        function formatT(ms) { let s = ms / 1000, mins = Math.floor(s / 60), secs = (s % 60).toFixed(2); return `${mins.toString().padStart(2, '0')}:${secs.padStart(5, '0')}`; }
+
+        player.bindEvents({
+            onplay: startRecording,
+            onpause: stopRecording,
+            onended: stopRecording,
+            ontimeupdate: () => {
+                if (!slider.matches(':active')) slider.value = player.currentTime;
+                let durMs = player.duration ? player.duration * 1000 : 0;
+                document.getElementById('timeDisplay').innerText = `${formatT(player.currentTime * 1000)} / ${formatT(durMs)}`;
+                drawChart();
+            },
+            onloadedmetadata: () => {
+                slider.max = player.duration;
+                mediaContainer.classList.toggle('is-audio', player.isAudioActive());
+                initGrid();
+                drawChart();
+            }
+        });
+        slider.oninput = () => { player.currentTime = slider.value; drawChart(); };
+        window.onkeydown = (e) => { if (e.code === "Space") { e.preventDefault(); player.paused ? player.play() : player.pause(); } };
+        window.onresize = () => { drawGrid(); drawChart(); };
+
+        function getCSVContent() {
+            if (disableYAxis) {
+                let csvContentSingle = `ms,${xName}\n`;
+                ratingData.forEach(d => { csvContentSingle += `${d.timeMs},${d.v.toFixed(3)}\n`; });
+                return csvContentSingle;
+            }
+            let csvContent = `ms,${xName},${yName}\n`;
+            ratingData.forEach(d => { csvContent += `${d.timeMs},${d.v.toFixed(3)},${d.a.toFixed(3)}\n`; });
+            return csvContent;
+        }
+
+        async function saveToServer() {
+            let subjectId = localStorage.getItem('val_subjectId') || "01";
+            let subjectPrefix = localStorage.getItem('val_subjectPrefix') || "";
+            let prefix = subjectPrefix ? subjectPrefix : "";
+
+            if (ratingData.length > 0) {
+                let filename = `${prefix}Sub${subjectId}_rating.csv`;
+                let content = getCSVContent();
+                try { await fetch('/api/save_csv', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ filename, content, saveFolder: saveFolderName }) }); } catch(e) {}
+            }
+
+            if (useEyeTracking && gazeData.length > 0) {
+                let gazeFilename = `${prefix}Sub${subjectId}_rating_gaze.csv`;
+                let gazeCsv = `Calibration_Accuracy,${calibrationAccuracy}\nTime(ms),Gaze_X,Gaze_Y,On_Video,On_Function_Bar,On_Time_Bar,Others\n`;
+                gazeData.forEach(d => { gazeCsv += `${Math.round(d.ms)},${Math.round(d.x)},${Math.round(d.y)},${d.onVideo},${d.onFunctionBar},${d.onTimeBar},${d.others}\n`; });
+                try { await fetch('/api/save_csv', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ filename: gazeFilename, content: gazeCsv, saveFolder: saveFolderName }) }); } catch(e) {}
+            }
+        }
+
+        function exportCSV() {
+            if (ratingData.length === 0) { alert("No rating data to export!"); return; }
+            let subjectId = localStorage.getItem('val_subjectId') || "01";
+            let subjectPrefix = localStorage.getItem('val_subjectPrefix') || "";
+            let prefix = subjectPrefix ? subjectPrefix : "";
+
+            let content = getCSVContent();
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8-sig," + content));
+            link.setAttribute("download", `${prefix}Sub${subjectId}_rating.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+
+            if (useEyeTracking && gazeData.length > 0) {
+                let gazeCsv = `Calibration_Accuracy,${calibrationAccuracy}\nTime(ms),Gaze_X,Gaze_Y,On_Video,On_Function_Bar,On_Time_Bar,Others\n`;
+                gazeData.forEach(d => { gazeCsv += `${Math.round(d.ms)},${Math.round(d.x)},${Math.round(d.y)},${d.onVideo},${d.onFunctionBar},${d.onTimeBar},${d.others}\n`; });
+
+                setTimeout(() => {
+                    const linkGaze = document.createElement("a");
+                    linkGaze.setAttribute("href", encodeURI("data:text/csv;charset=utf-8-sig," + gazeCsv));
+                    linkGaze.setAttribute("download", `${prefix}Sub${subjectId}_rating_gaze.csv`);
+                    document.body.appendChild(linkGaze); linkGaze.click(); document.body.removeChild(linkGaze);
+                }, 300);
+            }
+
+            saveToServer();
+        }
+
+        function showExitModal() { document.getElementById('exitModal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('exitModal').style.display = 'none'; }
+        async function confirmExit(shouldSave) { if (shouldSave) { if (ratingData.length > 0) { document.querySelector('.btn-save-exit').innerText = "Saving..."; await saveToServer(); } else { alert("No data to save."); } } window.location.href = '/'; }
+    </script>
+</body>
+</html>

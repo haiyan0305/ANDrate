@@ -1,0 +1,13 @@
+﻿Start,End,Label
+0,49000,Telling the children to go to sleep
+49000,173000,Telling a story
+173000,196000,Children sleeping
+196000,275000,Discussing with the Doctor
+275000,299000,Minions smirking/snickering
+299000,325000,Playing with the children
+325000,390000,The children being sent away
+390000,436000,After the children are gone
+436000,512000,Returning to the launch station
+512000,525000,Preparing for launch
+525000,580000,The enemy trying to disrupt things
+580000,600000,Disruption resolved

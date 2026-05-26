@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANDrate | Annotation Configuration</title>
+    <style>
+        :root {
+            --bg-color: #F5F5F7;
+            --card-bg: #FFFFFF;
+            --accent-color: #0071E3;
+            --text-main: #1D1D1F;
+            --text-sub: #86868B;
+            --border-radius: 18px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 页面顶部的加载进度条 */
+        .page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background-color: var(--accent-color);
+            width: 0%;
+            z-index: 9999;
+            transition: width 0.2s ease-out, opacity 0.5s ease-out;
+        }
+
+        .container { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 24px; }
+
+        h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 10px 0; }
+        h2 { font-size: 19px; font-weight: 600; margin: 0 0 20px 0; color: var(--text-main); }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        /* 表单布局 */
+        .form-row { display: flex; align-items: center; margin-bottom: 20px; gap: 16px; }
+        .upload-wrapper { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+        .label { width: 220px; font-size: 15px; font-weight: 500; color: var(--text-main); }
+
+        /* 输入框、下拉框通用样式 */
+        input[type="text"], input[type="number"], input[type="file"], select {
+            background: #F5F5F7; border: 1px solid transparent; border-radius: 12px;
+            padding: 12px 16px; font-size: 15px; outline: none; transition: var(--transition);
+            color: var(--text-main);
+        }
+        select {
+            cursor: pointer; appearance: none;
+            padding-right: 40px;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--accent-color); background: #FFFFFF; box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+        }
+
+        /* 视频上传进度条 */
+        .upload-progress-container {
+            display: none; width: 100%; background-color: #E8E8ED; border-radius: 8px; height: 6px; overflow: hidden; position: relative;
+        }
+        .upload-progress-bar { height: 100%; width: 0%; background-color: var(--accent-color); border-radius: 8px; transition: width 0.1s ease; }
+        .upload-status-text { font-size: 12px; color: var(--text-sub); align-self: flex-end; }
+
+        /* iOS 风格开关 */
+        .switch { position: relative; display: inline-block; width: 51px; height: 31px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #E9E9EA; transition: .3s; border-radius: 31px; }
+        .slider:before { position: absolute; content: ""; height: 27px; width: 27px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+        input:checked + .slider { background-color: #34C759; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* 按钮样式 */
+        .btn-primary { background: var(--accent-color); color: white; width: 100%; border: none; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 600; cursor: pointer; transition: var(--transition); margin-top: 10px; }
+        .btn-primary:hover { opacity: 0.9; transform: scale(0.99); }
+
+        .btn-calib { margin-left: 15px; background: #E8E8ED; color: var(--text-main); border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-calib:hover { background: #D1D1D6; }
+
+        .btn-group { display: flex; gap: 12px; margin-top: 20px; opacity: 0; visibility: hidden; height: 0; overflow: hidden; transition: all 0.5s ease; }
+        .btn-group.show { opacity: 1; visibility: visible; height: auto; padding-top: 10px; }
+
+        .btn-action { flex: 1; background: #E8E8ED; color: var(--text-main); text-decoration: none; text-align: center; border-radius: 14px; padding: 14px; font-size: 15px; font-weight: 600; transition: var(--transition); }
+        .btn-action:hover { background: #D1D1D6; transform: scale(0.98); }
+
+        /* 系统日志显示区 */
+        #log-container { background: #1D1D1F; color: #34C759; font-family: "SF Mono", "Menlo", monospace; font-size: 13px; padding: 16px; height: 120px; overflow-y: auto; border-radius: 14px; line-height: 1.5; }
+
+        .clear-cache-btn { background: none; border: none; color: var(--text-sub); font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 10px; text-align: center; width: 100%; }
+    </style>
+</head>
+<body>
+    <div id="pageLoader" class="page-loader"></div>
+
+    <div class="container">
+        <h1>ANDrate</h1>
+
+        <div class="card">
+            <h2>STEP 1: Meta Information</h2>
+            <div class="form-row">
+                <span class="label">Subject Prefix</span>
+                <input type="text" id="subjectPrefix" placeholder="e.g. dme, monkey1, p" style="flex: 1;">
+            </div>
+            <div class="form-row">
+                <span class="label">Subject ID</span>
+                <input type="text" id="subjectId" value="01" style="flex: 1;">
+            </div>
+            <div class="form-row">
+                <span class="label">Save File Name</span>
+                <input type="text" id="saveFolderName" placeholder="e.g. session_01" style="flex: 1;">
+            </div>
+            <div class="form-row">
+                <span class="label">Upload Video / Audio</span>
+                <div class="upload-wrapper">
+                    <input type="file" id="videoUpload" accept="video/*,audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.wma,.opus" style="width: 100%; box-sizing: border-box;">
+                    <div id="uploadProgressContainer" class="upload-progress-container">
+                        <div id="uploadProgressBar" class="upload-progress-bar"></div>
+                    </div>
+                    <span id="uploadStatusText" class="upload-status-text"></span>
+                </div>
+            </div>
+            <div class="form-row">
+                <span class="label">Select Target Media</span>
+                <select id="videoSelect" style="flex: 1;">
+                    <option value="">-- Loading media --</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>STEP 2: Global Task Settings</h2>
+            <div class="form-row">
+                <span class="label">Segmentation Sampling Frequency</span>
+                <input type="number" id="segAlign" value="1000.00" step="100" style="flex: 1;">
+                <span style="color:var(--text-sub); font-size: 14px; margin-left: -10px;">ms</span>
+            </div>
+            <div class="form-row">
+                <span class="label">Rating Sampling Frequency</span>
+                <input type="number" id="ratingSamplingMs" value="200" min="20" step="20" style="flex: 1;">
+                <span style="color:var(--text-sub); font-size: 14px; margin-left: -10px;">ms</span>
+            </div>
+
+            <div class="form-row">
+                <span class="label">X Axis Name & Range</span>
+                <input type="text" id="xAxisName" value="Valence" style="flex:2">
+                <input type="number" id="xMin" value="-5" style="flex:1" placeholder="Min">
+                <input type="number" id="xMax" value="5" style="flex:1" placeholder="Max">
+            </div>
+
+            <div class="form-row">
+                <span class="label">Y Axis Name & Range</span>
+                <input type="text" id="yAxisName" value="Arousal" style="flex:2">
+                <input type="number" id="yMin" value="-5" style="flex:1" placeholder="Min">
+                <input type="number" id="yMax" value="5" style="flex:1" placeholder="Max">
+            </div>
+            <div class="form-row">
+                <span class="label">Calibration Accuracy Threshold</span>
+                <input type="number" id="calibThreshold" value="60" min="0" max="100" step="1" style="flex: 1;">
+                <span style="color:var(--text-sub); font-size: 14px; margin-left: -10px;">%</span>
+            </div>
+
+            <div class="form-row">
+                <span class="label">Eye Tracking Module</span>
+                <label class="switch">
+                    <input type="checkbox" id="eyeTracking">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="form-row">
+                <span class="label">Rating: Disable Y Axis</span>
+                <label class="switch">
+                    <input type="checkbox" id="disableYAxis">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button class="btn-primary" id="saveBtn" onclick="saveSettings()">Save Configuration</button>
+
+            <div class="btn-group" id="action-buttons">
+                <a href="#" class="btn-action" onclick="goToTaskWithCalibration('segmentation')">Segmentation</a>
+                <a href="#" class="btn-action" onclick="goToTaskWithCalibration('rating')">Rating</a>
+                <a href="/post-rating-analysis" class="btn-action">Post-Rating Analysis</a>
+            </div>
+
+            <button class="clear-cache-btn" onclick="clearSettings()">Reset System State</button>
+        </div>
+
+        <div class="card">
+            <h2>System Logs</h2>
+            <div id="log-container">
+                <div>[INFO] System initialized.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 读取服务器上的视频和音频列表。
+        async function refreshVideoList(selectedFile = "") {
+            const select = document.getElementById('videoSelect');
+            try {
+                const response = await fetch('/api/media');
+                const videoFiles = await response.json();
+
+                select.innerHTML = "";
+                if (!Array.isArray(videoFiles) || videoFiles.length === 0) {
+                    select.innerHTML = '<option value="">-- No media in uploads/ --</option>';
+                    return;
+                }
+
+                videoFiles.forEach(fileName => {
+                    const opt = document.createElement('option');
+                    opt.value = fileName;
+                    opt.textContent = fileName;
+                    if (fileName === selectedFile) opt.selected = true;
+                    select.appendChild(opt);
+                });
+
+                if (!selectedFile) {
+                    const lastUsed = localStorage.getItem('val_selectedVideo');
+                    if (lastUsed) select.value = lastUsed;
+                }
+            } catch (error) {
+                addLog("Error fetching video list from server.");
+            }
+        }
+
+        // 页面加载后恢复上次保存的配置。
+        document.addEventListener('DOMContentLoaded', () => {
+            // 顶部进度条只用于显示页面加载状态。
+            const pageLoader = document.getElementById('pageLoader');
+            let loadProgress = 0;
+            const loadInterval = setInterval(() => {
+                loadProgress += Math.random() * 20;
+                if (loadProgress >= 85) { clearInterval(loadInterval); loadProgress = 85; }
+                pageLoader.style.width = loadProgress + '%';
+            }, 100);
+
+            window.addEventListener('load', () => {
+                clearInterval(loadInterval);
+                pageLoader.style.width = '100%';
+                setTimeout(() => { pageLoader.style.opacity = '0'; }, 400);
+            });
+
+            // 初始化媒体列表。
+            refreshVideoList();
+
+            // 从 localStorage 恢复已保存的设置。
+            if (localStorage.getItem('config_is_saved') === 'true') {
+                if(localStorage.getItem('val_subjectId')) document.getElementById('subjectId').value = localStorage.getItem('val_subjectId');
+                if(localStorage.getItem('val_subjectPrefix')) document.getElementById('subjectPrefix').value = localStorage.getItem('val_subjectPrefix');
+                if(localStorage.getItem('val_saveFolderName')) document.getElementById('saveFolderName').value = localStorage.getItem('val_saveFolderName');
+                if(localStorage.getItem('val_segAlign')) document.getElementById('segAlign').value = localStorage.getItem('val_segAlign');
+                if(localStorage.getItem('val_ratingSamplingMs')) document.getElementById('ratingSamplingMs').value = localStorage.getItem('val_ratingSamplingMs');
+
+                // 恢复自定义坐标轴名称。
+                if(localStorage.getItem('val_xName')) document.getElementById('xAxisName').value = localStorage.getItem('val_xName');
+                if(localStorage.getItem('val_yName')) document.getElementById('yAxisName').value = localStorage.getItem('val_yName');
+
+                if(localStorage.getItem('val_xMin')) document.getElementById('xMin').value = localStorage.getItem('val_xMin');
+                if(localStorage.getItem('val_xMax')) document.getElementById('xMax').value = localStorage.getItem('val_xMax');
+                if(localStorage.getItem('val_yMin')) document.getElementById('yMin').value = localStorage.getItem('val_yMin');
+                if(localStorage.getItem('val_yMax')) document.getElementById('yMax').value = localStorage.getItem('val_yMax');
+                if(localStorage.getItem('val_calibThreshold')) document.getElementById('calibThreshold').value = localStorage.getItem('val_calibThreshold');
+                if(localStorage.getItem('val_eyeTracking') === 'true') document.getElementById('eyeTracking').checked = true;
+                if(localStorage.getItem('val_disableYAxis') === 'true') document.getElementById('disableYAxis').checked = true;
+
+                const btnPrimary = document.getElementById('saveBtn');
+                btnPrimary.innerText = "Configuration Active";
+                btnPrimary.style.background = "#34C759";
+                document.getElementById('action-buttons').classList.add('show');
+                addLog("Restored session state from memory.");
+            }
+        });
+
+        // 上传用户选择的视频或音频。
+        document.getElementById('videoUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const statusText = document.getElementById('uploadStatusText');
+
+            const formData = new FormData();
+            formData.append('media', file);
+
+            const xhr = new XMLHttpRequest();
+            progressContainer.style.display = 'block';
+            addLog(`Uploading: ${file.name}`);
+
+            // 更新上传进度条。
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percent + '%';
+                    statusText.innerText = `Uploading: ${Math.floor(percent)}%`;
+                }
+            };
+
+            // 上传完成后刷新媒体列表。
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
+                    progressBar.style.backgroundColor = '#34C759';
+                    statusText.innerText = 'Upload Successful';
+                    addLog(`Success: ${res.filename} saved to folder.`);
+
+                    // 选中刚上传的文件。
+                    refreshVideoList(res.filename);
+                } else {
+                    addLog("Upload failed. Server error.");
+                }
+            };
+
+            xhr.open('POST', '/upload', true);
+            xhr.send(formData);
+        });
+
+        // 写入日志。
+        function addLog(message) {
+            const container = document.getElementById('log-container');
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${time}] ${message}`;
+            container.appendChild(logEntry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 保存当前配置到本地缓存。
+        function saveSettings() {
+            addLog("Syncing configuration...");
+            const btnPrimary = document.getElementById('saveBtn');
+            btnPrimary.innerText = "Saving...";
+
+            // 保留一个短暂的保存状态，避免按钮状态跳变太快。
+            setTimeout(() => {
+                localStorage.setItem('config_is_saved', 'true');
+                localStorage.setItem('val_subjectId', document.getElementById('subjectId').value);
+                localStorage.setItem('val_subjectPrefix', document.getElementById('subjectPrefix').value);
+                localStorage.setItem('val_saveFolderName', document.getElementById('saveFolderName').value.trim());
+                localStorage.setItem('val_segAlign', document.getElementById('segAlign').value);
+                localStorage.setItem('val_ratingSamplingMs', document.getElementById('ratingSamplingMs').value || '200');
+
+                // 保存自定义坐标轴名称和范围。
+                localStorage.setItem('val_xName', document.getElementById('xAxisName').value);
+                localStorage.setItem('val_yName', document.getElementById('yAxisName').value);
+                localStorage.setItem('val_xMin', document.getElementById('xMin').value);
+                localStorage.setItem('val_xMax', document.getElementById('xMax').value);
+                localStorage.setItem('val_yMin', document.getElementById('yMin').value);
+                localStorage.setItem('val_yMax', document.getElementById('yMax').value);
+                localStorage.setItem('val_calibThreshold', document.getElementById('calibThreshold').value || '60');
+
+                // 保存开关和媒体选择。
+                localStorage.setItem('val_eyeTracking', document.getElementById('eyeTracking').checked);
+                localStorage.setItem('val_disableYAxis', document.getElementById('disableYAxis').checked);
+                localStorage.setItem('val_selectedVideo', document.getElementById('videoSelect').value);
+
+                addLog("Profile updated. Pipeline ready.");
+
+                btnPrimary.innerText = "Configuration Active";
+                btnPrimary.style.background = "#34C759";
+                document.getElementById('action-buttons').classList.add('show');
+            }, 600);
+        }
+
+        // 清空本地状态并重新加载页面。
+        function clearSettings() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        function goToTaskWithCalibration(taskName) {
+            const eyeTrackingEnabled = document.getElementById('eyeTracking').checked;
+            if (eyeTrackingEnabled) {
+                window.location.href = `/calibration?target=${encodeURIComponent(taskName)}&attempt=0`;
+            } else {
+                window.location.href = `/${taskName}`;
+            }
+        }
+    </script>
+</body>
+</html>

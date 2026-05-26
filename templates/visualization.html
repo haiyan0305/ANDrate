@@ -1,0 +1,1586 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>ANDrate | Post-Rating Analysis</title>
+    <style>
+        :root {
+            --bg-color: #F5F5F7;
+            --card-bg: #FFFFFF;
+            --accent-color: #0071E3;
+            --text-main: #1D1D1F;
+            --text-sub: #86868B;
+            --border-radius: 18px;
+            --chart-val: #0071E3;
+            --chart-aro: #FF3B30;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+            background-color: var(--bg-color);
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            box-sizing: border-box; min-height: 100vh;
+        }
+
+        .header { width: 100%; max-width: 1100px; display: flex; justify-content: space-between; align-items: center; padding: 10px 0 20px 0; }
+        .btn-back { text-decoration: none; color: var(--accent-color); font-weight: 500; font-size: 15px; }
+
+        .card {
+            background: var(--card-bg); border-radius: var(--border-radius); padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04); width: 100%; max-width: 1100px; margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        h2 { font-size: 19px; font-weight: 600; margin-top: 0; margin-bottom: 20px; color: var(--text-main); }
+        h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px 0; color: var(--text-main); }
+
+        .form-row { display: flex; align-items: center; margin-bottom: 20px; gap: 16px; }
+        .label { width: 220px; font-size: 15px; font-weight: 500; color: var(--text-main); flex-shrink: 0; }
+        select, input[type="file"] {
+            flex: 1; background: #F5F5F7; border: 1px solid transparent; border-radius: 12px;
+            padding: 12px 16px; font-size: 15px; outline: none; transition: 0.3s;
+        }
+        select { cursor: pointer; appearance: none; padding-right: 40px; }
+        .btn-calc { background: var(--accent-color); color: white; width: 100%; border: none; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-calc:hover { opacity: 0.9; transform: scale(0.99); }
+
+        #player-card { display: none; flex-direction: column; gap: 15px; }
+
+        .video-wrap {
+            position: relative; background: #000; border-radius: 12px; width: 100%; aspect-ratio: 16/9;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .video-wrap.is-audio { aspect-ratio: auto; min-height: 88px; background: #F5F5F7; padding: 12px 16px; }
+        .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .video-wrap audio { width: 100%; max-width: 560px; display: none; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; gap: 12px; flex-wrap: wrap; }
+        .live-stats { font-size: 16px; font-weight: bold; color: var(--accent-color); }
+
+        .toggle-group { display: flex; gap: 10px; }
+        .btn-toggle {
+            background: #F5F5F7; border: 2px solid #1D1D1F; font-weight: 700;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+            transition: all 0.2s; color: #1D1D1F;
+        }
+        .btn-toggle.inactive { background: #FFFFFF; border-color: #D1D1D6; color: #86868B; }
+
+        .canvas-container { width: 100%; height: 180px; border: 1px solid #E5E5E7; border-radius: 8px; background: #FFFFFF; overflow: hidden; }
+        canvas.chart-canvas { width: 100%; height: 100%; display: block; }
+        .hidden { display: none !important; }
+        .small-note { font-size: 12px; color: var(--text-sub); margin-top: -8px; margin-bottom: 16px; }
+        .data-summary { font-size: 13px; color: var(--text-sub); background: #FAFAFC; border: 1px solid #E5E5E7; border-radius: 10px; padding: 10px 12px; margin: -6px 0 18px 236px; }
+
+        .analysis-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-bottom: 20px; }
+        .opt-item { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text-main); }
+        .opt-item input { margin-top: 3px; }
+        .opt-item.disabled { opacity: 0.45; }
+        .opt-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .results-grid { grid-template-columns: 1fr; } }
+
+        .result-panel {
+            border: 1px solid #E5E5E7; border-radius: 12px; padding: 16px; background: #FAFAFC;
+        }
+        .result-panel.full-width { grid-column: 1 / -1; }
+
+        .calib-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .calib-table th, .calib-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #E5E5E7; }
+        .calib-bar { height: 8px; border-radius: 4px; background: #E5E5E7; overflow: hidden; }
+        .calib-bar-fill { height: 100%; background: var(--accent-color); border-radius: 4px; }
+
+        .region-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .region-table th, .region-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #E5E5E7; }
+        .region-table th:first-child, .region-table td:first-child { text-align: left; }
+        .region-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #E5E5E7; min-width: 180px; }
+        .region-bar span { display: block; height: 100%; }
+
+        .isc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .isc-table th, .isc-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #E5E5E7; }
+        .isc-summary { margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--accent-color); }
+        .isc-viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+        .isc-viz-grid.single { grid-template-columns: 1fr; }
+        .isc-chart-title { font-size: 13px; font-weight: 600; margin: 0 0 6px 0; color: var(--text-main); }
+        .isc-hist-canvas { width: 100%; height: 180px; border: 1px solid #E5E5E7; border-radius: 8px; background: #FFFFFF; }
+
+        .boundary-controls { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+        .boundary-participant-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; font-size: 14px; }
+        .boundary-participant-bar select {
+            min-width: 200px; background: #F5F5F7; border: 1px solid transparent; border-radius: 10px;
+            padding: 8px 12px; font-size: 14px;
+        }
+        .boundary-canvas-wrap { width: 100%; height: 220px; border: 1px solid #E5E5E7; border-radius: 8px; background: #FFFFFF; overflow: hidden; margin-bottom: 12px; }
+        .label-cloud-wrap { width: 100%; height: 160px; border: 1px solid #E5E5E7; border-radius: 8px; background: #FFFFFF; overflow: hidden; margin-bottom: 8px; }
+        .label-cloud-wrap.label-cloud-stacked { height: 180px; }
+        .label-cloud-wrap.label-cloud-timeline { height: 130px; }
+        .label-cloud-hint { font-size: 11px; color: var(--text-sub); margin: -2px 0 6px 0; }
+        #boundaryCanvas, .label-cloud-canvas { width: 100%; height: 100%; display: block; }
+        .label-cloud-title { font-size: 13px; font-weight: 600; margin: 4px 0 6px 0; color: var(--text-main); }
+        .boundary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .boundary-table th, .boundary-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #E5E5E7; }
+        .boundary-table th:first-child, .boundary-table td:first-child { text-align: left; }
+        .param-inline { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-main); margin: -6px 0 18px 236px; }
+        .param-inline input { width: 90px; background: #F5F5F7; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+
+        .legend { display: flex; justify-content: center; gap: 20px; font-size: 13px; font-weight: 500; margin-top: 5px; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .box-color { width: 14px; height: 14px; border-radius: 3px; }
+
+        .footer-row { display: flex; justify-content: space-between; margin-top: 10px; flex-wrap: wrap; gap: 10px; }
+        .btn-play { background: #E8E8ED; color: var(--text-main); border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        .btn-export-group { background: #34C759; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+
+        .tag-soon { font-size: 11px; background: #E8E8ED; color: var(--text-sub); padding: 2px 8px; border-radius: 6px; margin-left: 6px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <a href="/" class="btn-back">Back to Configuration</a>
+        <div style="font-weight: 600;">Phase 3: Post-Rating Analysis</div>
+        <div style="width: 100px;"></div>
+    </div>
+
+    <div class="card" id="config-card">
+        <h2>Data Selection</h2>
+        <div class="form-row">
+            <span class="label">Load Mode</span>
+            <select id="loadMode" onchange="onLoadModeChange()">
+                <option value="auto">Auto: Select data folder</option>
+                <option value="manual">Manual: Select files</option>
+            </select>
+        </div>
+        <div class="form-row" id="autoFolderRow">
+            <span class="label">Data Folder</span>
+            <select id="dataFolderSelect" onchange="onDataFolderChange()"></select>
+        </div>
+        <div class="form-row">
+            <span class="label">Select Target Media</span>
+            <select id="videoSelect"><option value="">-- Loading media --</option></select>
+        </div>
+        <div class="form-row manual-row">
+            <span class="label">Segmentation CSVs</span>
+            <input type="file" id="segFiles" accept=".csv" multiple>
+        </div>
+        <div class="form-row manual-row">
+            <span class="label">Rating CSVs</span>
+            <input type="file" id="ratFiles" accept=".csv" multiple>
+        </div>
+        <div class="form-row manual-row">
+            <span class="label">Segmentation Gaze CSVs</span>
+            <input type="file" id="segGazeFiles" accept=".csv" multiple>
+        </div>
+        <div class="form-row manual-row">
+            <span class="label">Rating Gaze CSVs</span>
+            <input type="file" id="ratGazeFiles" accept=".csv" multiple>
+        </div>
+        <p class="small-note" id="autoHint">Auto mode reads only the selected folder (not its subfolders). &quot;(data root)&quot; means CSV files sitting directly in <code>data/</code>. If your files live in <code>data/dme/</code>, <code>data/p/</code>, etc., choose that subfolder in Data Folder. One folder ≈ one video session.</p>
+        <div class="data-summary" id="dataSummary">Segmentation, rating, and matching gaze files will be loaded from the selected source.</div>
+        <div class="param-inline">
+            <span>Consensus boundary window</span>
+            <input type="number" id="boundaryWindowSec" value="4" min="0" step="0.5">
+            <span>seconds (±)</span>
+        </div>
+        <div class="param-inline">
+            <span>Min rater overlap</span>
+            <input type="number" id="boundaryMinOverlap" value="50" min="1" max="100" step="5">
+            <span>% of raters in cluster</span>
+        </div>
+
+        <h2>Analysis Options</h2>
+        <div class="analysis-options">
+            <label class="opt-item">
+                <input type="checkbox" id="optGaze" checked>
+                <div>
+                    <div>1. Eye-tracking QC</div>
+                    <div class="opt-desc">Per-participant attention-region statistics and calibration accuracy</div>
+                </div>
+            </label>
+            <label class="opt-item">
+                <input type="checkbox" id="optISC" checked>
+                <div>
+                    <div>2. Continuous Rating — ISC</div>
+                    <div class="opt-desc">Leave-one-out Pearson correlation per dimension</div>
+                </div>
+            </label>
+            <label class="opt-item">
+                <input type="checkbox" id="optGroupMean" checked>
+                <div>
+                    <div>3. Continuous Rating — Group Average</div>
+                    <div class="opt-desc">Group mean ratings synced to video timeline</div>
+                </div>
+            </label>
+            <label class="opt-item">
+                <input type="checkbox" id="optSegDice" checked>
+                <div>
+                    <div>4. Segmentation — Consensus Boundaries</div>
+                    <div class="opt-desc">Cluster boundaries within ±window; label clouds for individual &amp; group</div>
+                </div>
+            </label>
+            <label class="opt-item">
+                <input type="checkbox" id="optSummary" checked>
+                <div>
+                    <div>5. Summary — Rating + Consensus Boundaries</div>
+                    <div class="opt-desc">Overlay group mean ratings with consensus segmentation boundaries</div>
+                </div>
+            </label>
+        </div>
+
+        <button class="btn-calc" onclick="processData()">Run Selected Analyses</button>
+    </div>
+
+    <div class="card" id="player-card">
+        <div class="video-wrap" id="mediaWrap">
+            <video id="mainVideo" playsinline></video>
+            <audio id="mainAudio" controls preload="metadata"></audio>
+        </div>
+
+        <div style="display: flex; flex-direction: column; width: 100%;">
+            <div id="timeDisplay" style="font-family: 'SF Mono', Consolas, monospace; font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 4px;">00:00.00 / 00:00.00</div>
+            <input type="range" id="videoSlider" min="0" value="0" step="0.1" style="width: 100%; cursor: pointer; margin: 0;">
+        </div>
+
+        <div class="info-row" id="groupMeanRow">
+            <div class="live-stats" id="statsDisplay">Group Average: X: -- | Y: --</div>
+            <div class="toggle-group">
+                <button class="btn-toggle" id="btnToggleRat" onclick="toggleLayer('rat')">Rating</button>
+            </div>
+        </div>
+
+        <div id="ratingChartSection" class="hidden">
+            <div class="canvas-container">
+                <canvas id="groupChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="legend" id="ratingLegend">
+                <div class="legend-item"><div class="box-color" style="background: var(--chart-val);"></div> <span id="legVal">X (Group Mean)</span></div>
+                <div class="legend-item"><div class="box-color" style="background: var(--chart-aro);"></div> <span id="legAro">Y (Group Mean)</span></div>
+            </div>
+        </div>
+
+        <div id="summaryChartSection" class="hidden">
+            <h3 style="margin: 0 0 8px 0; font-size: 15px;">Summary: Group Rating + Consensus Boundaries</h3>
+            <div class="canvas-container">
+                <canvas id="summaryChart" class="chart-canvas"></canvas>
+            </div>
+            <div class="legend" id="summaryLegend">
+                <div class="legend-item"><div class="box-color" style="background: var(--chart-val);"></div> <span id="sumLegVal">X (Group Mean)</span></div>
+                <div class="legend-item"><div class="box-color" style="background: var(--chart-aro);"></div> <span id="sumLegAro">Y (Group Mean)</span></div>
+                <div class="legend-item"><div class="box-color" style="background:#1D1D1F; width:3px; height:14px;"></div> Consensus boundary</div>
+            </div>
+        </div>
+
+        <div id="boundaryChartSection" class="hidden">
+            <h3 style="margin: 0 0 8px 0; font-size: 15px;">Segmentation Boundaries</h3>
+
+            <div class="label-cloud-title">Group label cloud (all subjects)</div>
+            <div class="label-cloud-hint" id="groupLabelHint">All subjects merged around playhead</div>
+            <div class="label-cloud-wrap label-cloud-stacked">
+                <canvas id="consensusLabelCanvas" class="label-cloud-canvas"></canvas>
+            </div>
+
+            <div class="boundary-participant-bar">
+                <span>Individual subject</span>
+                <select id="boundaryParticipantSelect" onchange="onBoundaryParticipantChange()"></select>
+            </div>
+            <div class="boundary-controls">
+                <button class="btn-toggle" id="btnToggleConsensus" onclick="toggleBoundaryLayer('consensus')">Consensus</button>
+                <button class="btn-toggle" id="btnToggleIndividualBoundary" onclick="toggleBoundaryLayer('individual')">Individual boundaries</button>
+            </div>
+            <div class="boundary-canvas-wrap">
+                <canvas id="boundaryCanvas"></canvas>
+            </div>
+            <div class="legend" id="boundaryLegend"></div>
+
+            <div class="label-cloud-title" id="individualLabelTitle">Individual labels</div>
+            <div class="label-cloud-hint" id="individualLabelHint">Segment labels along the timeline</div>
+            <div class="label-cloud-wrap label-cloud-timeline">
+                <canvas id="individualLabelCanvas" class="label-cloud-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="results-grid" id="resultsGrid"></div>
+
+        <div class="footer-row">
+            <button class="btn-play" onclick="togglePlay()">Play / Pause (Space)</button>
+            <button class="btn-export-group" onclick="exportGroupData()">Export Results & Exit</button>
+        </div>
+    </div>
+
+    <script src="/static/media.js"></script>
+    <script>
+        const mediaWrap = document.getElementById('mediaWrap');
+        const player = ANDrateMedia.createPlayer(
+            document.getElementById('mainVideo'),
+            document.getElementById('mainAudio')
+        );
+        const slider = document.getElementById('videoSlider');
+        const canvas = document.getElementById('groupChart');
+        const summaryCanvas = document.getElementById('summaryChart');
+        const statsDisplay = document.getElementById('statsDisplay');
+        const resultsGrid = document.getElementById('resultsGrid');
+
+        let xName = localStorage.getItem('val_xName') || "Valence";
+        let yName = localStorage.getItem('val_yName') || "Arousal";
+        const xMin = parseFloat(localStorage.getItem('val_xMin')) || -5;
+        const xMax = parseFloat(localStorage.getItem('val_xMax')) || 5;
+        const yMin = parseFloat(localStorage.getItem('val_yMin')) || -5;
+        const yMax = parseFloat(localStorage.getItem('val_yMax')) || 5;
+
+        let showRating = true;
+        let summaryActive = false;
+        let groupRatingData = [];
+        let ratingsByParticipant = new Map();
+        let segmentationSources = [];
+        let segmentationByParticipant = new Map();
+        let consensusBoundaries = [];
+        let segAnalysisMeta = { nParticipants: 0, windowMs: 4000, minOverlap: 0.5 };
+        let selectedBoundaryPid = '';
+        let showBoundaryConsensus = true;
+        let showIndividualBoundary = true;
+        let gazeRegionCounts = { onVideo: 0, onFunction: 0, onTime: 0, others: 0 };
+        let gazeRegionByParticipant = new Map();
+        let calibrationByParticipant = new Map();
+        let iscResults = [];
+        let autoManifest = null;
+        let yAxisEnabled = true;
+
+        const PIE_COLORS = ['#0071E3', '#FF9500', '#34C759', '#86868B'];
+        const PIE_LABELS = ['On Video', 'Function Bar', 'Time Bar', 'Others'];
+        const PARTICIPANT_COLORS = ['#0071E3', '#FF9500', '#34C759', '#AF52DE', '#FF2D55', '#5856D6', '#00C7BE', '#FF6482'];
+
+        function subjectFromPid(pid) {
+            const m = pid.match(/Sub(\d+)/i);
+            return m ? `Sub${m[1]}` : pid;
+        }
+
+        function participantColor(pid) {
+            const keys = Array.from(segmentationByParticipant.keys()).sort();
+            const idx = keys.indexOf(pid);
+            return PARTICIPANT_COLORS[(idx >= 0 ? idx : 0) % PARTICIPANT_COLORS.length];
+        }
+
+        function hashLabelColor(label) {
+            let h = 0;
+            for (let i = 0; i < label.length; i++) h = ((h << 5) - h) + label.charCodeAt(i);
+            const hue = Math.abs(h) % 360;
+            return `hsla(${hue}, 62%, 88%, 0.92)`;
+        }
+
+        function hexToRgba(hex, alpha) {
+            const h = (hex || '#86868B').replace('#', '');
+            const r = parseInt(h.slice(0, 2), 16);
+            const g = parseInt(h.slice(2, 4), 16);
+            const b = parseInt(h.slice(4, 6), 16);
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+
+        function parseSegCsv(text) {
+            const lines = parseCsvLines(text);
+            if (lines.length < 2) return { segments: [], boundaries: [] };
+            const segments = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const start = parseInt(cols[0], 10);
+                const end = parseInt(cols[1], 10);
+                const label = cols.length > 2 ? cols.slice(2).join(',').trim() : '';
+                if (isNaN(start) || isNaN(end)) continue;
+                segments.push({ start, end, label });
+            }
+            const boundaries = segments.map(s => s.end).filter(ms => ms > 0);
+            return { segments, boundaries };
+        }
+
+        function clusterBoundaries(allBoundaries, windowMs, minOverlapRatio, totalRaters) {
+            const sorted = [...allBoundaries].sort((a, b) => a.ms - b.ms);
+            const used = new Array(sorted.length).fill(false);
+            const clusters = [];
+
+            for (let i = 0; i < sorted.length; i++) {
+                if (used[i]) continue;
+                const cluster = [sorted[i]];
+                used[i] = true;
+                let changed = true;
+                while (changed) {
+                    changed = false;
+                    const mean = cluster.reduce((s, c) => s + c.ms, 0) / cluster.length;
+                    for (let j = 0; j < sorted.length; j++) {
+                        if (used[j]) continue;
+                        if (Math.abs(sorted[j].ms - mean) <= windowMs) {
+                            cluster.push(sorted[j]);
+                            used[j] = true;
+                            changed = true;
+                        }
+                    }
+                }
+                const pids = new Set(cluster.map(c => c.pid));
+                if (totalRaters > 0 && pids.size / totalRaters >= minOverlapRatio) {
+                    clusters.push({
+                        timeMs: cluster.reduce((s, c) => s + c.ms, 0) / cluster.length,
+                        nRaters: pids.size,
+                        participants: [...pids].sort()
+                    });
+                }
+            }
+            return clusters.sort((a, b) => a.timeMs - b.timeMs);
+        }
+
+        function getTimelineDurationMs() {
+            const maxEnd = Math.max(0, ...Array.from(segmentationByParticipant.values()).flatMap(d =>
+                d.segments.map(s => s.end)
+            ));
+            return player.duration ? player.duration * 1000 : maxEnd || 1;
+        }
+
+        function populateBoundaryParticipantSelect() {
+            const sel = document.getElementById('boundaryParticipantSelect');
+            if (!sel) return;
+            const pids = Array.from(segmentationByParticipant.keys()).sort();
+            sel.innerHTML = '';
+            pids.forEach(pid => {
+                const opt = document.createElement('option');
+                opt.value = pid;
+                opt.textContent = `${subjectFromPid(pid)} (${pid})`;
+                sel.appendChild(opt);
+            });
+            if (!selectedBoundaryPid || !segmentationByParticipant.has(selectedBoundaryPid)) {
+                selectedBoundaryPid = pids[0] || '';
+            }
+            sel.value = selectedBoundaryPid;
+            const title = document.getElementById('individualLabelTitle');
+            if (title) title.textContent = `Individual labels – ${subjectFromPid(selectedBoundaryPid)}`;
+        }
+
+        function onBoundaryParticipantChange() {
+            selectedBoundaryPid = document.getElementById('boundaryParticipantSelect').value;
+            const title = document.getElementById('individualLabelTitle');
+            if (title) title.textContent = `Individual labels – ${subjectFromPid(selectedBoundaryPid)}`;
+            drawBoundaryVisuals();
+        }
+
+        function computeSegmentationAnalysis(segSources) {
+            segmentationByParticipant = new Map();
+            consensusBoundaries = [];
+
+            const windowMs = (parseFloat(document.getElementById('boundaryWindowSec').value) || 4) * 1000;
+            const minOverlap = (parseFloat(document.getElementById('boundaryMinOverlap').value) || 50) / 100;
+
+            segSources.forEach(src => {
+                const pid = participantFromName(src.name);
+                const parsed = parseSegCsv(src.text);
+                segmentationByParticipant.set(pid, parsed);
+            });
+
+            const allBoundaries = [];
+            segmentationByParticipant.forEach((data, pid) => {
+                data.boundaries.forEach(ms => allBoundaries.push({ ms, pid }));
+            });
+
+            const nParticipants = segmentationByParticipant.size;
+            consensusBoundaries = clusterBoundaries(allBoundaries, windowMs, minOverlap, nParticipants);
+
+            segAnalysisMeta = { nParticipants, windowMs, minOverlap };
+            populateBoundaryParticipantSelect();
+        }
+
+        function setLegends() {
+            document.getElementById('legVal').innerText = `${xName} (Group Mean)`;
+            document.getElementById('legAro').innerText = `${yName} (Group Mean)`;
+            const sumLegVal = document.getElementById('sumLegVal');
+            const sumLegAro = document.getElementById('sumLegAro');
+            if (sumLegVal) sumLegVal.innerText = `${xName} (Group Mean)`;
+            if (sumLegAro) {
+                sumLegAro.innerText = `${yName} (Group Mean)`;
+                sumLegAro.parentElement.style.display = yAxisEnabled ? '' : 'none';
+            }
+            statsDisplay.innerText = `Group Average: ${xName}: -- | ${yName}: --`;
+        }
+
+        function parseCsvLines(text) {
+            return text.split('\n').map(v => v.replace('\r', '')).filter(v => v.trim());
+        }
+
+        function participantFromName(name) {
+            return name.replace(/_seg_gaze\.csv$/i, '')
+                       .replace(/_rating_gaze\.csv$/i, '')
+                       .replace(/_seg\.csv$/i, '')
+                       .replace(/_rating\.csv$/i, '');
+        }
+
+        function pearson(xs, ys) {
+            const len = Math.min(xs.length, ys.length);
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0, n = 0;
+            for (let i = 0; i < len; i++) {
+                const x = xs[i], y = ys[i];
+                if (isNaN(x) || isNaN(y)) continue;
+                n++;
+                sumX += x; sumY += y;
+                sumXY += x * y;
+                sumX2 += x * x;
+                sumY2 += y * y;
+            }
+            if (n < 3) return NaN;
+            const denom = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+            if (denom === 0) return NaN;
+            return (n * sumXY - sumX * sumY) / denom;
+        }
+
+        function emptyRegionCounts() {
+            return { onVideo: 0, onFunction: 0, onTime: 0, others: 0 };
+        }
+
+        function addRegionCount(target, onVideo, onFunction, onTime) {
+            if (onVideo) target.onVideo++;
+            else if (onFunction) target.onFunction++;
+            else if (onTime) target.onTime++;
+            else target.others++;
+        }
+
+        function regionTotal(counts) {
+            return counts.onVideo + counts.onFunction + counts.onTime + counts.others;
+        }
+
+        function regionPercentages(counts) {
+            const total = regionTotal(counts);
+            return [
+                total ? (counts.onVideo / total) * 100 : 0,
+                total ? (counts.onFunction / total) * 100 : 0,
+                total ? (counts.onTime / total) * 100 : 0,
+                total ? (counts.others / total) * 100 : 0
+            ];
+        }
+
+        function parseGazeCsv(text, pid) {
+            const lines = parseCsvLines(text);
+            let calib = null;
+            let headerIdx = 0;
+            if (lines.length > 0 && lines[0].toLowerCase().startsWith('calibration')) {
+                const parts = lines[0].split(',');
+                calib = parseFloat(parts[1]);
+                if (!isNaN(calib)) {
+                    if (!calibrationByParticipant.has(pid)) calibrationByParticipant.set(pid, []);
+                    calibrationByParticipant.get(pid).push(calib);
+                }
+                headerIdx = 1;
+            }
+            if (lines.length <= headerIdx + 1) return;
+            const headers = lines[headerIdx].split(',').map(h => h.trim().toLowerCase());
+            const ix = headers.indexOf('gaze_x');
+            const iy = headers.indexOf('gaze_y');
+            const iVideo = headers.findIndex(h => h.includes('on_video'));
+            const iFunc = headers.findIndex(h => h.includes('function'));
+            const iTime = headers.findIndex(h => h.includes('time_bar') || h === 'on_time');
+            const iOther = headers.findIndex(h => h === 'others');
+            if (ix < 0 || iy < 0) return;
+
+            for (let i = headerIdx + 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const gx = parseFloat(cols[ix]);
+                const gy = parseFloat(cols[iy]);
+
+                const flag = (idx) => idx >= 0 && (cols[idx] || '').trim().toLowerCase() === 'true';
+                const onVideo = flag(iVideo);
+                const onFunction = flag(iFunc);
+                const onTime = flag(iTime);
+                if (isNaN(gx) || isNaN(gy)) continue;
+
+                if (!gazeRegionByParticipant.has(pid)) gazeRegionByParticipant.set(pid, emptyRegionCounts());
+                addRegionCount(gazeRegionCounts, onVideo, onFunction, onTime);
+                addRegionCount(gazeRegionByParticipant.get(pid), onVideo, onFunction, onTime);
+            }
+        }
+
+        function parseRatingCsv(text, pid) {
+            const lines = parseCsvLines(text);
+            if (lines.length < 2) return;
+            const headers = lines[0].split(',');
+            const series = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const ms = parseInt(cols[0], 10);
+                const v = parseFloat(cols[1]);
+                const a = cols.length > 2 ? parseFloat(cols[2]) : 0;
+                if (isNaN(ms) || isNaN(v)) continue;
+                series.push({ ms, v, a: isNaN(a) ? 0 : a });
+            }
+            ratingsByParticipant.set(pid, series);
+        }
+
+        function computeGroupMean() {
+            const ratingMap = new Map();
+            ratingsByParticipant.forEach(series => {
+                series.forEach(d => {
+                    if (!ratingMap.has(d.ms)) ratingMap.set(d.ms, { vSum: 0, aSum: 0, count: 0 });
+                    const obj = ratingMap.get(d.ms);
+                    obj.vSum += d.v;
+                    obj.aSum += d.a;
+                    obj.count += 1;
+                });
+            });
+            groupRatingData = Array.from(ratingMap.entries()).map(([ms, obj]) => ({
+                ms, v: obj.vSum / obj.count, a: obj.aSum / obj.count
+            })).sort((a, b) => a.ms - b.ms);
+        }
+
+        function computeISC() {
+            iscResults = [];
+            const pids = Array.from(ratingsByParticipant.keys());
+            if (pids.length < 2) return;
+
+            const allMs = new Set();
+            pids.forEach(pid => ratingsByParticipant.get(pid).forEach(d => allMs.add(d.ms)));
+            const msList = Array.from(allMs).sort((a, b) => a - b);
+            const ratingMaps = new Map();
+            pids.forEach(pid => ratingMaps.set(pid, new Map(ratingsByParticipant.get(pid).map(d => [d.ms, d]))));
+
+            pids.forEach(pid => {
+                const selfMap = ratingMaps.get(pid);
+                const others = pids.filter(p => p !== pid);
+
+                const xs = [], ys = [], looXs = [], looYs = [];
+                msList.forEach(ms => {
+                    const self = selfMap.get(ms);
+                    if (!self) return;
+                    let vSum = 0, aSum = 0, cnt = 0;
+                    others.forEach(op => {
+                        const pt = ratingMaps.get(op).get(ms);
+                        if (pt) { vSum += pt.v; aSum += pt.a; cnt++; }
+                    });
+                    if (cnt === 0) return;
+                    xs.push(self.v); ys.push(self.a);
+                    looXs.push(vSum / cnt); looYs.push(aSum / cnt);
+                });
+
+                iscResults.push({
+                    pid,
+                    rX: pearson(xs, looXs),
+                    rY: yAxisEnabled ? pearson(ys, looYs) : NaN
+                });
+            });
+        }
+
+        function buildRegionBar(counts) {
+            const pcts = regionPercentages(counts);
+            return `<div class="region-bar">
+                ${pcts.map((pct, i) => `<span style="width:${pct.toFixed(2)}%; background:${PIE_COLORS[i]}"></span>`).join('')}
+            </div>`;
+        }
+
+        function buildRegionCells(counts) {
+            const pcts = regionPercentages(counts);
+            return pcts.map(pct => `<td>${pct.toFixed(1)}%</td>`).join('');
+        }
+
+        function computeMeanRegionPercentages() {
+            const rows = Array.from(gazeRegionByParticipant.values()).filter(c => regionTotal(c) > 0);
+            if (rows.length === 0) return [0, 0, 0, 0];
+            const sums = [0, 0, 0, 0];
+            rows.forEach(counts => {
+                regionPercentages(counts).forEach((pct, i) => { sums[i] += pct; });
+            });
+            return sums.map(v => v / rows.length);
+        }
+
+        function drawPlayhead(ctx, w, h, dur) {
+            const curX = (player.currentTime * 1000 / dur) * w;
+            ctx.strokeStyle = '#FF3B30';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.moveTo(curX, 0);
+            ctx.lineTo(curX, h);
+            ctx.stroke();
+        }
+
+        function labelCloudHalfWindowMs() {
+            return (parseFloat(document.getElementById('boundaryWindowSec').value) || 4) * 1000;
+        }
+
+        function tokenizeLabel(label) {
+            return (label || '').toLowerCase()
+                .split(/[\s,;:.!?]+/)
+                .map(t => t.trim())
+                .filter(t => t.length >= 2);
+        }
+
+        function collectWordWeightsFromSegments(segments, centerMs, halfWindowMs) {
+            const winStart = centerMs - halfWindowMs;
+            const winEnd = centerMs + halfWindowMs;
+            const weights = new Map();
+            segments.forEach(seg => {
+                const ovStart = Math.max(seg.start, winStart);
+                const ovEnd = Math.min(seg.end, winEnd);
+                if (ovEnd <= ovStart || !seg.label) return;
+                const dt = ovEnd - ovStart;
+                tokenizeLabel(seg.label).forEach(word => {
+                    weights.set(word, (weights.get(word) || 0) + dt);
+                });
+            });
+            return [...weights.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .map(([text, weight]) => ({ text, weight }));
+        }
+
+        function collectGroupWordWeights(centerMs, halfWindowMs) {
+            const merged = new Map();
+            segmentationByParticipant.forEach((data, pid) => {
+                collectWordWeightsFromSegments(data.segments, centerMs, halfWindowMs).forEach(({ text, weight }) => {
+                    if (!merged.has(text)) merged.set(text, { weight: 0, byPid: new Map() });
+                    const row = merged.get(text);
+                    row.weight += weight;
+                    row.byPid.set(pid, (row.byPid.get(pid) || 0) + weight);
+                });
+            });
+            return [...merged.entries()]
+                .sort((a, b) => b[1].weight - a[1].weight)
+                .slice(0, 22)
+                .map(([text, row]) => {
+                    let topPid = '';
+                    let topW = 0;
+                    row.byPid.forEach((w, pid) => { if (w > topW) { topW = w; topPid = pid; } });
+                    return { text, weight: row.weight, pid: topPid };
+                });
+        }
+
+        function drawWordCloudLayout(ctx, w, h, items, colorFn) {
+            ctx.fillStyle = '#FAFAFC';
+            ctx.fillRect(0, 0, w, h);
+            if (items.length === 0) {
+                ctx.fillStyle = '#86868B';
+                ctx.font = '13px -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('No labels in current time window', w / 2, h / 2);
+                return;
+            }
+            const maxW = Math.max(...items.map(i => i.weight));
+            const placed = [];
+            const cx = w / 2;
+            const cy = h / 2;
+
+            function hits(x, y, tw, th) {
+                return placed.some(p => !(x + tw + 2 < p.x || p.x + p.w + 2 < x || y + th + 2 < p.y || p.y + p.h + 2 < y));
+            }
+
+            items.forEach((item, idx) => {
+                const fontSize = Math.max(10, Math.min(24, 10 + (item.weight / maxW) * 14));
+                ctx.font = `${idx < 3 ? '600 ' : ''}${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+                const tw = ctx.measureText(item.text).width;
+                const th = fontSize + 2;
+                let x = cx - tw / 2;
+                let y = cy - th / 2;
+                let found = !hits(x, y, tw, th);
+                if (!found) {
+                    for (let ring = 1; ring <= 40 && !found; ring++) {
+                        const pts = Math.max(6, ring * 3);
+                        for (let p = 0; p < pts; p++) {
+                            const ang = (p / pts) * Math.PI * 2 + ring * 0.35;
+                            const rad = ring * 7;
+                            x = cx + Math.cos(ang) * rad - tw / 2;
+                            y = cy + Math.sin(ang) * rad - th / 2;
+                            x = Math.max(6, Math.min(w - tw - 6, x));
+                            y = Math.max(6, Math.min(h - th - 6, y));
+                            if (!hits(x, y, tw, th)) { found = true; break; }
+                        }
+                    }
+                }
+                if (!found) return;
+                ctx.fillStyle = colorFn ? colorFn(item) : hashLabelColor(item.text);
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(item.text, x, y);
+                placed.push({ x, y, w: tw, h: th });
+            });
+        }
+
+        function updateLabelCloudHints(centerMs, halfWindowMs) {
+            const hint = `${formatT(centerMs - halfWindowMs)} – ${formatT(centerMs + halfWindowMs)}`;
+            const grp = document.getElementById('groupLabelHint');
+            if (grp) grp.textContent = `All subjects merged · ±${(halfWindowMs / 1000).toFixed(1)}s · ${hint}`;
+        }
+
+
+        function wrapLabelLines(ctx, text, maxWidth) {
+            const words = (text || '').split(/\s+/).filter(Boolean);
+            if (words.length === 0) return [];
+            const lines = [];
+            let line = words[0];
+            for (let i = 1; i < words.length; i++) {
+                const test = line + ' ' + words[i];
+                if (ctx.measureText(test).width <= maxWidth) line = test;
+                else { lines.push(line); line = words[i]; }
+            }
+            lines.push(line);
+            return lines;
+        }
+
+        function drawLabelSegmentsInBand(ctx, w, segments, dur, y0, y1, tint) {
+            const bandH = y1 - y0;
+            segments.forEach(seg => {
+                const x0 = (seg.start / dur) * w;
+                const x1 = (seg.end / dur) * w;
+                const segW = Math.max(1, x1 - x0);
+                if (!seg.label) return;
+
+                ctx.fillStyle = tint || hashLabelColor(seg.label);
+                ctx.fillRect(x0, y0, segW, bandH);
+
+                const pad = 3;
+                const innerW = Math.max(8, segW - pad * 2);
+                let fontSize = Math.min(13, Math.max(8, Math.sqrt(segW) * 0.95));
+                let lines = [];
+                while (fontSize >= 7) {
+                    ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+                    lines = wrapLabelLines(ctx, seg.label, innerW);
+                    if (lines.length * (fontSize + 2) <= bandH - 4) break;
+                    fontSize -= 1;
+                }
+                ctx.fillStyle = '#1D1D1F';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const blockH = lines.length * (fontSize + 2);
+                let y = y0 + (bandH - blockH) / 2 + fontSize / 2;
+                lines.forEach(line => {
+                    if (ctx.measureText(line).width > innerW) {
+                        let t = line;
+                        while (t.length > 3 && ctx.measureText(t + '…').width > innerW) t = t.slice(0, -1);
+                        line = t + '…';
+                    }
+                    ctx.fillText(line, x0 + segW / 2, y);
+                    y += fontSize + 2;
+                });
+            });
+        }
+
+        function drawLabelCloud(canvasId, segments, dur) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            const ctx = el.getContext('2d');
+            const w = el.width = el.offsetWidth;
+            const h = el.height = el.offsetHeight;
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#FAFAFC';
+            ctx.fillRect(0, 0, w, h);
+            drawLabelSegmentsInBand(ctx, w, segments, dur, 4, h - 4);
+            drawPlayhead(ctx, w, h, dur);
+        }
+
+        function drawGroupTimeWordCloud(canvasId, curMs) {
+            const el = document.getElementById(canvasId);
+            if (!el) return;
+            const ctx = el.getContext('2d');
+            const w = el.width = el.offsetWidth;
+            const h = el.height = el.offsetHeight;
+            const half = labelCloudHalfWindowMs();
+            const items = collectGroupWordWeights(curMs, half);
+            ctx.clearRect(0, 0, w, h);
+            drawWordCloudLayout(ctx, w, h, items, item => item.pid ? participantColor(item.pid) : '#1D1D1F');
+        }
+
+        function drawBoundaryCanvas() {
+            const bCanvas = document.getElementById('boundaryCanvas');
+            if (!bCanvas) return;
+            const ctx = bCanvas.getContext('2d');
+            const w = bCanvas.width = bCanvas.offsetWidth;
+            const h = bCanvas.height = bCanvas.offsetHeight;
+            const dur = getTimelineDurationMs();
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.fillStyle = '#FAFAFC';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#E5E5E7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+
+            if (showIndividualBoundary && selectedBoundaryPid && segmentationByParticipant.has(selectedBoundaryPid)) {
+                const data = segmentationByParticipant.get(selectedBoundaryPid);
+                ctx.strokeStyle = participantColor(selectedBoundaryPid);
+                ctx.globalAlpha = 0.95;
+                ctx.lineWidth = 2;
+                data.boundaries.forEach(ms => {
+                    const x = (ms / dur) * w;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                    ctx.stroke();
+                });
+                ctx.globalAlpha = 1;
+            }
+
+            if (showBoundaryConsensus) {
+                ctx.strokeStyle = '#1D1D1F';
+                ctx.lineWidth = 3;
+                consensusBoundaries.forEach(c => {
+                    const x = (c.timeMs / dur) * w;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, h);
+                    ctx.stroke();
+                });
+            }
+
+            drawPlayhead(ctx, w, h, dur);
+
+            const legendEl = document.getElementById('boundaryLegend');
+            if (legendEl) {
+                let leg = '';
+                if (showBoundaryConsensus) {
+                    leg += `<div class="legend-item"><div class="box-color" style="background:#1D1D1F; width:3px; height:14px;"></div>Consensus</div>`;
+                }
+                if (showIndividualBoundary && selectedBoundaryPid) {
+                    const col = participantColor(selectedBoundaryPid);
+                    leg += `<div class="legend-item"><div class="box-color" style="background:${col};"></div>${subjectFromPid(selectedBoundaryPid)}</div>`;
+                }
+                legendEl.innerHTML = leg;
+            }
+        }
+
+        function drawBoundaryVisuals() {
+            const curMs = player.currentTime * 1000;
+            const half = labelCloudHalfWindowMs();
+            updateLabelCloudHints(curMs, half);
+            drawBoundaryCanvas();
+            const dur = getTimelineDurationMs();
+            const indData = segmentationByParticipant.get(selectedBoundaryPid);
+            drawLabelCloud(
+                'individualLabelCanvas',
+                indData ? indData.segments : [],
+                dur
+            );
+            drawGroupTimeWordCloud('consensusLabelCanvas', curMs);
+        }
+
+        function toggleBoundaryLayer(layer) {
+            if (layer === 'consensus') showBoundaryConsensus = !showBoundaryConsensus;
+            if (layer === 'individual') showIndividualBoundary = !showIndividualBoundary;
+            document.getElementById('btnToggleConsensus').classList.toggle('inactive', !showBoundaryConsensus);
+            document.getElementById('btnToggleIndividualBoundary').classList.toggle('inactive', !showIndividualBoundary);
+            drawBoundaryVisuals();
+        }
+
+        function drawISCHistogram(canvasId, values, mean, label) {
+            const canvasEl = document.getElementById(canvasId);
+            if (!canvasEl) return;
+            const ctx = canvasEl.getContext('2d');
+            const w = canvasEl.width = canvasEl.offsetWidth;
+            const h = canvasEl.height = canvasEl.offsetHeight;
+            const margin = { left: 46, right: 14, top: 18, bottom: 32 };
+            const plotW = w - margin.left - margin.right;
+            const plotH = h - margin.top - margin.bottom;
+            const binWidth = 0.2;
+            const bins = Array.from({ length: 10 }, (_, i) => ({ start: -1 + i * binWidth, count: 0 }));
+
+            values.filter(v => !isNaN(v)).forEach(v => {
+                const idx = Math.max(0, Math.min(9, Math.floor((Math.min(0.999999, Math.max(-1, v)) + 1) / binWidth)));
+                bins[idx].count++;
+            });
+            const maxCount = Math.max(1, ...bins.map(b => b.count));
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#1D1D1F';
+            ctx.font = '12px -apple-system, sans-serif';
+            ctx.fillText(label, margin.left, 12);
+
+            ctx.strokeStyle = '#D1D1D6';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(margin.left, margin.top);
+            ctx.lineTo(margin.left, margin.top + plotH);
+            ctx.lineTo(margin.left + plotW, margin.top + plotH);
+            ctx.stroke();
+
+            const tickMax = Math.max(1, maxCount);
+            const tickStep = Math.max(1, Math.ceil(tickMax / 4));
+            ctx.fillStyle = '#86868B';
+            ctx.font = '11px -apple-system, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let c = 0; c <= tickMax; c += tickStep) {
+                const y = margin.top + plotH - (c / tickMax) * plotH;
+                ctx.fillText(String(c), margin.left - 8, y);
+                ctx.strokeStyle = c === 0 ? '#D1D1D6' : '#ECECEF';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(margin.left, y);
+                ctx.lineTo(margin.left + plotW, y);
+                ctx.stroke();
+            }
+            if (tickMax % tickStep !== 0) {
+                ctx.fillText(String(tickMax), margin.left - 8, margin.top);
+            }
+
+            bins.forEach(bin => {
+                const x = margin.left + ((bin.start + 1) / 2) * plotW;
+                const bw = (binWidth / 2) * plotW - 2;
+                const bh = (bin.count / maxCount) * plotH;
+                ctx.fillStyle = '#0071E3';
+                ctx.fillRect(x + 1, margin.top + plotH - bh, Math.max(1, bw), bh);
+            });
+
+            if (!isNaN(mean)) {
+                const mx = margin.left + ((Math.max(-1, Math.min(1, mean)) + 1) / 2) * plotW;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(mx, margin.top);
+                ctx.lineTo(mx, margin.top + plotH);
+                ctx.stroke();
+                ctx.fillStyle = '#000000';
+                ctx.fillText(`mean ${mean.toFixed(3)}`, Math.min(mx + 5, w - 78), margin.top + 12);
+            }
+
+            ctx.fillStyle = '#86868B';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'alphabetic';
+            for (let v = -1; v <= 1.0001; v += 0.5) {
+                const x = margin.left + ((v + 1) / 2) * plotW;
+                ctx.fillText(v.toFixed(1), x, h - 10);
+            }
+            ctx.textAlign = 'left';
+            ctx.fillText('count', 4, margin.top + 8);
+        }
+
+        function renderResultsPanels(opts) {
+            resultsGrid.innerHTML = '';
+            if (opts.gaze) {
+                const panel = document.createElement('div');
+                panel.className = 'result-panel full-width';
+                let regionHtml = `<h3>Attention Region Distribution</h3>`;
+                if (gazeRegionByParticipant.size === 0) {
+                    regionHtml += `<p class="small-note">No attention-region samples found in gaze files.</p>`;
+                } else {
+                    regionHtml += `<table class="region-table"><thead><tr><th>Participant</th><th>Distribution</th>`;
+                    PIE_LABELS.forEach(lbl => { regionHtml += `<th>${lbl}</th>`; });
+                    regionHtml += `<th>Samples</th></tr></thead><tbody>`;
+                    Array.from(gazeRegionByParticipant.entries()).sort((a, b) => a[0].localeCompare(b[0])).forEach(([pid, counts]) => {
+                        regionHtml += `<tr><td>${pid}</td><td>${buildRegionBar(counts)}</td>${buildRegionCells(counts)}<td>${regionTotal(counts)}</td></tr>`;
+                    });
+                    const meanPcts = computeMeanRegionPercentages();
+                    const meanCounts = {
+                        onVideo: meanPcts[0],
+                        onFunction: meanPcts[1],
+                        onTime: meanPcts[2],
+                        others: meanPcts[3]
+                    };
+                    regionHtml += `<tr><td><strong>Group mean</strong></td><td>${buildRegionBar(meanCounts)}</td>${meanPcts.map(pct => `<td><strong>${pct.toFixed(1)}%</strong></td>`).join('')}<td>${regionTotal(gazeRegionCounts)}</td></tr>`;
+                    regionHtml += `</tbody></table><div class="legend">`;
+                    PIE_LABELS.forEach((lbl, i) => {
+                        regionHtml += `<div class="legend-item"><div class="box-color" style="background:${PIE_COLORS[i]}"></div>${lbl}</div>`;
+                    });
+                    regionHtml += `</div>`;
+                }
+                panel.innerHTML = regionHtml;
+                resultsGrid.appendChild(panel);
+
+                const calPanel = document.createElement('div');
+                calPanel.className = 'result-panel';
+                let calHtml = `<h3>Calibration Accuracy</h3>`;
+                const calibrationRows = Array.from(calibrationByParticipant.entries()).map(([pid, scores]) => ({
+                    pid,
+                    score: scores.reduce((a, b) => a + b, 0) / scores.length
+                })).sort((a, b) => a.pid.localeCompare(b.pid));
+                if (calibrationRows.length === 0) {
+                    calHtml += `<p class="small-note">No calibration scores found in gaze files.</p>`;
+                } else {
+                    calHtml += `<table class="calib-table"><thead><tr><th>Participant</th><th>Score</th><th></th></tr></thead><tbody>`;
+                    calibrationRows.forEach(({ pid, score }) => {
+                        const pct = Math.min(100, Math.max(0, score));
+                        calHtml += `<tr><td>${pid}</td><td>${score.toFixed(1)}%</td><td><div class="calib-bar"><div class="calib-bar-fill" style="width:${pct}%"></div></div></td></tr>`;
+                    });
+                    const avg = calibrationRows.reduce((s, c) => s + c.score, 0) / calibrationRows.length;
+                    calHtml += `</tbody></table><p class="isc-summary">Group mean: ${avg.toFixed(1)}%</p>`;
+                }
+                calPanel.innerHTML = calHtml;
+                resultsGrid.appendChild(calPanel);
+            }
+
+            if (opts.isc && iscResults.length > 0) {
+                const panel = document.createElement('div');
+                panel.className = 'result-panel full-width';
+                const validX = iscResults.map(r => r.rX).filter(v => !isNaN(v));
+                const validY = iscResults.map(r => r.rY).filter(v => !isNaN(v));
+                const meanX = validX.length ? validX.reduce((a, b) => a + b, 0) / validX.length : NaN;
+                const meanY = validY.length ? validY.reduce((a, b) => a + b, 0) / validY.length : NaN;
+                let html = `<h3>Inter-Subject Correlation (ISC)</h3>
+                    <p class="small-note">Pearson r between each participant and leave-one-out group mean. Histogram bin width = 0.2; black line = mean r.</p>
+                    <div class="isc-viz-grid ${yAxisEnabled ? '' : 'single'}">
+                        <div>
+                            <div class="isc-chart-title">${xName}</div>
+                            <canvas id="iscHistX" class="isc-hist-canvas"></canvas>
+                        </div>`;
+                if (yAxisEnabled) {
+                    html += `<div>
+                            <div class="isc-chart-title">${yName}</div>
+                            <canvas id="iscHistY" class="isc-hist-canvas"></canvas>
+                        </div>`;
+                }
+                html += `</div>
+                    <table class="isc-table"><thead><tr><th>Participant</th><th>${xName}</th>`;
+                if (yAxisEnabled) html += `<th>${yName}</th>`;
+                html += `</tr></thead><tbody>`;
+                iscResults.forEach(r => {
+                    html += `<tr><td>${r.pid}</td><td>${isNaN(r.rX) ? '—' : r.rX.toFixed(3)}</td>`;
+                    if (yAxisEnabled) html += `<td>${isNaN(r.rY) ? '—' : r.rY.toFixed(3)}</td>`;
+                    html += `</tr>`;
+                });
+                html += `</tbody></table>`;
+                html += `<p class="isc-summary">Mean ISC (${xName}): ${isNaN(meanX) ? '—' : meanX.toFixed(3)}`;
+                if (yAxisEnabled) html += ` | ${yName}: ${isNaN(meanY) ? '—' : meanY.toFixed(3)}`;
+                html += `</p>`;
+                panel.innerHTML = html;
+                resultsGrid.appendChild(panel);
+                drawISCHistogram('iscHistX', validX, meanX, xName);
+                if (yAxisEnabled) drawISCHistogram('iscHistY', validY, meanY, yName);
+            }
+
+        }
+
+        async function loadVideos() {
+            const select = document.getElementById('videoSelect');
+            try {
+                const res = await fetch('/api/media');
+                if (!res.ok) {
+                    select.innerHTML = `<option value="">-- Videos: server error (${res.status}) --</option>`;
+                    return;
+                }
+                const payload = await res.json();
+                const files = Array.isArray(payload) ? payload : [];
+                select.innerHTML = '';
+                if (files.length === 0) {
+                    select.innerHTML = '<option value="">-- No media in uploads/ --</option>';
+                    return;
+                }
+                files.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f;
+                    opt.textContent = f;
+                    if (f === localStorage.getItem('val_selectedVideo')) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error(e);
+                select.innerHTML = '<option value="">-- Videos: cannot reach server (use Flask URL) --</option>';
+            }
+        }
+
+        function manifestHasTrackedCsvs(files) {
+            if (!files) return false;
+            return (files.seg && files.seg.length) || (files.rating && files.rating.length)
+                || (files.seg_gaze && files.seg_gaze.length) || (files.rating_gaze && files.rating_gaze.length);
+        }
+
+        async function loadDataFolders() {
+            const sel = document.getElementById('dataFolderSelect');
+            const sum = document.getElementById('dataSummary');
+            const addOption = (value, text) => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = text;
+                sel.appendChild(opt);
+            };
+            const failMsg = (msg) => {
+                sel.innerHTML = '';
+                addOption('.', '(data root)');
+                if (sum) sum.textContent = msg;
+            };
+
+            sel.innerHTML = '';
+            try {
+                const res = await fetch('/api/data_folders');
+                if (!res.ok) {
+                    failMsg(`Could not list folders (HTTP ${res.status}). Open this page from the running app: http://127.0.0.1:9005/visualization — do not open the HTML file directly.`);
+                    return;
+                }
+                const data = await res.json();
+                let folders = data.folders;
+                if (!Array.isArray(folders) || folders.length === 0) folders = ['.'];
+                folders.forEach(f => {
+                    addOption(f, f === '.' ? '(data root)' : f);
+                });
+                sel.value = '.';
+
+                let rootMan = {};
+                try {
+                    const mRes = await fetch(`/api/data_manifest?folder=${encodeURIComponent('.')}`);
+                    if (mRes.ok) rootMan = await mRes.json();
+                } catch (e) {
+                    console.error(e);
+                }
+                if (!manifestHasTrackedCsvs(rootMan.files)) {
+                    for (const f of folders) {
+                        if (f === '.') continue;
+                        try {
+                            const mRes = await fetch(`/api/data_manifest?folder=${encodeURIComponent(f)}`);
+                            if (!mRes.ok) continue;
+                            const m = await mRes.json();
+                            if (manifestHasTrackedCsvs(m.files)) {
+                                sel.value = f;
+                                break;
+                            }
+                        } catch (e) { /* Try the next folder. */ }
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+                failMsg('Network error listing folders. Start the server (python app.py) and open http://127.0.0.1:9005/visualization');
+            }
+        }
+
+        function onDataFolderChange() {
+            const sum = document.getElementById('dataSummary');
+            if (!sum) return;
+            const t = sum.textContent || '';
+            if (t.startsWith('Could not') || t.startsWith('Network error')) return;
+            const folder = document.getElementById('dataFolderSelect').value || '.';
+            const label = folder === '.' ? 'data root' : folder;
+            sum.textContent = `Auto load will use folder: ${label}`;
+        }
+
+        async function loadManifest() {
+            const folder = document.getElementById('dataFolderSelect').value || '.';
+            const res = await fetch(`/api/data_manifest?folder=${encodeURIComponent(folder)}`);
+            autoManifest = await res.json();
+        }
+
+        function onLoadModeChange() {
+            const auto = document.getElementById('loadMode').value === 'auto';
+            document.querySelectorAll('.manual-row').forEach(el => el.classList.toggle('hidden', auto));
+            document.getElementById('autoFolderRow').classList.toggle('hidden', !auto);
+            document.getElementById('autoHint').classList.toggle('hidden', !auto);
+        }
+
+        async function fetchFolderCsvTexts(folder, kind) {
+            const res = await fetch(`/api/data_manifest?folder=${encodeURIComponent(folder)}`);
+            const manifest = await res.json();
+            const names = (manifest.files && manifest.files[kind]) || [];
+            const out = [];
+            for (const name of names) {
+                const fileRes = await fetch(`/api/data_file?folder=${encodeURIComponent(folder)}&filename=${encodeURIComponent(name)}`);
+                const data = await fileRes.json();
+                if (data.status === 'success') out.push({ name, text: data.content });
+            }
+            return out;
+        }
+
+        async function getAutoFileTexts(kind) {
+            const folder = document.getElementById('dataFolderSelect').value || '.';
+            return fetchFolderCsvTexts(folder, kind);
+        }
+
+        async function readFileList(input) {
+            return Promise.all(Array.from(input.files).map(async f => ({ name: f.name, text: await f.text() })));
+        }
+
+        async function processData() {
+            const opts = {
+                gaze: document.getElementById('optGaze').checked,
+                isc: document.getElementById('optISC').checked,
+                groupMean: document.getElementById('optGroupMean').checked,
+                segDice: document.getElementById('optSegDice').checked,
+                summary: document.getElementById('optSummary').checked
+            };
+            if (!opts.gaze && !opts.isc && !opts.groupMean && !opts.segDice && !opts.summary) {
+                alert("Please select at least one analysis option.");
+                return;
+            }
+
+            const loadMode = document.getElementById('loadMode').value;
+            let segSources = [], ratSources = [], gazeSources = [];
+
+            if (loadMode === 'auto') {
+                await loadManifest();
+                segSources = await getAutoFileTexts('seg');
+                ratSources = await getAutoFileTexts('rating');
+                const segGaze = await getAutoFileTexts('seg_gaze');
+                const ratGaze = await getAutoFileTexts('rating_gaze');
+                gazeSources = [...segGaze, ...ratGaze];
+            } else {
+                segSources = await readFileList(document.getElementById('segFiles'));
+                ratSources = await readFileList(document.getElementById('ratFiles'));
+                const segG = await readFileList(document.getElementById('segGazeFiles'));
+                const ratG = await readFileList(document.getElementById('ratGazeFiles'));
+                gazeSources = [...segG, ...ratG];
+            }
+
+            segmentationSources = segSources;
+            ratingsByParticipant = new Map();
+            segmentationByParticipant = new Map();
+            consensusBoundaries = [];
+            gazeRegionCounts = emptyRegionCounts();
+            gazeRegionByParticipant = new Map();
+            calibrationByParticipant = new Map();
+            groupRatingData = [];
+            iscResults = [];
+
+            if (segSources.length === 0 && ratSources.length === 0 && gazeSources.length === 0) {
+                alert("No segmentation, rating, or gaze CSV files detected.");
+                return;
+            }
+
+            if (opts.gaze && gazeSources.length === 0) {
+                alert("Eye-tracking QC requires gaze CSV files (*_rating_gaze.csv / *_seg_gaze.csv).");
+                return;
+            }
+            if ((opts.isc || opts.groupMean || opts.summary) && ratSources.length === 0) {
+                alert("Rating analyses require rating CSV files.");
+                return;
+            }
+            if ((opts.segDice || opts.summary) && segSources.length === 0) {
+                alert("Segmentation consensus requires *_seg.csv files.");
+                return;
+            }
+            if ((opts.segDice || opts.summary) && segSources.length < 2) {
+                alert("Segmentation consensus needs at least 2 subject *_seg.csv files (e.g. Sub01, Sub02) in the same folder.");
+                return;
+            }
+
+            if (ratSources.length > 0) {
+                const headers = parseCsvLines(ratSources[0].text)[0].split(',');
+                if (headers.length >= 2) {
+                    xName = headers[1].trim();
+                    yName = headers.length >= 3 ? headers[2].trim() : '';
+                    yAxisEnabled = headers.length >= 3;
+                    setLegends();
+                }
+                ratSources.forEach(src => parseRatingCsv(src.text, participantFromName(src.name)));
+            }
+
+            gazeSources.forEach(src => parseGazeCsv(src.text, participantFromName(src.name)));
+
+            if (opts.groupMean || opts.summary) computeGroupMean();
+            if (opts.isc) computeISC();
+            if (opts.segDice || opts.summary) computeSegmentationAnalysis(segSources);
+
+            summaryActive = opts.summary;
+            document.getElementById('ratingChartSection').classList.toggle('hidden', !opts.groupMean);
+            document.getElementById('summaryChartSection').classList.toggle('hidden', !opts.summary);
+            document.getElementById('boundaryChartSection').classList.toggle('hidden', !opts.segDice);
+            document.getElementById('groupMeanRow').classList.toggle('hidden', !opts.groupMean && !opts.gaze && !opts.segDice && !opts.summary);
+            document.getElementById('btnToggleRat').classList.toggle('hidden', !opts.groupMean && !opts.summary);
+            if (!opts.groupMean && opts.gaze) {
+                const gazeTotal = regionTotal(gazeRegionCounts);
+                statsDisplay.innerText = `Eye-tracking QC: ${gazeTotal} gaze samples`;
+            } else if (!opts.groupMean && opts.segDice) {
+                statsDisplay.innerText = `Segmentation · ${segAnalysisMeta.nParticipants} subjects`;
+            } else if (opts.summary && groupRatingData.length > 0) {
+                statsDisplay.innerText = `Summary: ${xName} + consensus boundaries`;
+            }
+            let summary = `Loaded ${segSources.length} segmentation, ${ratSources.length} rating, and ${gazeSources.length} gaze files.`;
+            if (opts.segDice || opts.summary) {
+                summary += ` Segmentation: ${segAnalysisMeta.nParticipants} subjects, ±${(segAnalysisMeta.windowMs/1000).toFixed(1)}s window.`;
+            }
+            if (opts.summary) summary += ` Summary overlay enabled.`;
+            document.getElementById('dataSummary').innerText = summary;
+
+            renderResultsPanels(opts);
+
+            document.getElementById('config-card').style.display = 'none';
+            document.getElementById('player-card').style.display = 'flex';
+            const vSel = document.getElementById('videoSelect').value;
+            if (vSel) {
+                player.load(vSel);
+                mediaWrap.classList.toggle('is-audio', player.isAudioActive());
+            }
+            if (opts.groupMean) drawRatingCanvas();
+            if (opts.summary) drawSummaryCanvas();
+            if (opts.segDice) {
+                document.getElementById('btnToggleConsensus').classList.toggle('inactive', !showBoundaryConsensus);
+                document.getElementById('btnToggleIndividualBoundary').classList.toggle('inactive', !showIndividualBoundary);
+                drawBoundaryVisuals();
+            }
+        }
+
+        function drawRatingLines(ctx, w, h, dur) {
+            if (!showRating || groupRatingData.length === 0) return;
+            ctx.strokeStyle = '#0071E3';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            groupRatingData.forEach((d, i) => {
+                const x = (d.ms / dur) * w;
+                const y = h - ((d.v - xMin) / (xMax - xMin)) * h;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            if (yAxisEnabled) {
+                ctx.strokeStyle = '#FF3B30';
+                ctx.beginPath();
+                groupRatingData.forEach((d, i) => {
+                    const x = (d.ms / dur) * w;
+                    const y = h - ((d.a - yMin) / (yMax - yMin)) * h;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
+        }
+
+        function drawConsensusLines(ctx, w, h, dur) {
+            if (consensusBoundaries.length === 0) return;
+            ctx.strokeStyle = '#1D1D1F';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            consensusBoundaries.forEach(c => {
+                const x = (c.timeMs / dur) * w;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            });
+            ctx.setLineDash([]);
+        }
+
+        function drawRatingCanvas() {
+            if (!canvas || groupRatingData.length === 0) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width = canvas.offsetWidth;
+            const h = canvas.height = canvas.offsetHeight;
+            const dur = player.duration * 1000 || 1;
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = '#E5E5E7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+            drawRatingLines(ctx, w, h, dur);
+            const curX = (player.currentTime * 1000 / dur) * w;
+            ctx.strokeStyle = '#1D1D1F';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(curX, 0);
+            ctx.lineTo(curX, h);
+            ctx.stroke();
+        }
+
+        function drawSummaryCanvas() {
+            if (!summaryCanvas || !summaryActive) return;
+            if (groupRatingData.length === 0 && consensusBoundaries.length === 0) return;
+            const ctx = summaryCanvas.getContext('2d');
+            const w = summaryCanvas.width = summaryCanvas.offsetWidth;
+            const h = summaryCanvas.height = summaryCanvas.offsetHeight;
+            const dur = player.duration * 1000 || getTimelineDurationMs() || 1;
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = '#E5E5E7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, h / 2);
+            ctx.lineTo(w, h / 2);
+            ctx.stroke();
+            drawConsensusLines(ctx, w, h, dur);
+            drawRatingLines(ctx, w, h, dur);
+            const curX = (player.currentTime * 1000 / dur) * w;
+            ctx.strokeStyle = '#FF3B30';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(curX, 0);
+            ctx.lineTo(curX, h);
+            ctx.stroke();
+        }
+
+        function toggleLayer(layer) {
+            if (layer === 'rat') {
+                showRating = !showRating;
+                document.getElementById('btnToggleRat').classList.toggle('inactive', !showRating);
+                drawRatingCanvas();
+                if (summaryActive) drawSummaryCanvas();
+            }
+        }
+
+        function formatT(ms) {
+            const s = ms / 1000;
+            const mins = Math.floor(s / 60);
+            const secs = (s % 60).toFixed(2);
+            return `${mins.toString().padStart(2, '0')}:${secs.padStart(5, '0')}`;
+        }
+
+        function togglePlay() {
+            player.paused ? player.play() : player.pause();
+        }
+
+        player.bindEvents({
+        ontimeupdate: () => {
+            if (!slider.matches(':active')) slider.value = player.currentTime;
+            const durMs = player.duration ? player.duration * 1000 : 0;
+            document.getElementById('timeDisplay').innerText = `${formatT(player.currentTime * 1000)} / ${formatT(durMs)}`;
+            if (groupRatingData.length > 0) {
+                const curMs = player.currentTime * 1000;
+                const closest = groupRatingData.reduce((p, c) => Math.abs(c.ms - curMs) < Math.abs(p.ms - curMs) ? c : p);
+                let txt = summaryActive ? `Summary: ${xName}: ${closest.v.toFixed(3)}` : `Group Average: ${xName}: ${closest.v.toFixed(3)}`;
+                if (yAxisEnabled) txt += ` | ${yName}: ${closest.a.toFixed(3)}`;
+                statsDisplay.innerText = txt;
+            }
+            drawRatingCanvas();
+            if (summaryActive) drawSummaryCanvas();
+            if (segmentationByParticipant.size > 0) drawBoundaryVisuals();
+        },
+        onloadedmetadata: () => {
+            slider.max = player.duration;
+            drawRatingCanvas();
+            if (summaryActive) drawSummaryCanvas();
+            if (segmentationByParticipant.size > 0) {
+                computeSegmentationAnalysis(segmentationSources);
+                drawBoundaryVisuals();
+                if (summaryActive) drawSummaryCanvas();
+            }
+        }
+        });
+        slider.oninput = () => {
+            player.currentTime = slider.value;
+            drawRatingCanvas();
+            if (summaryActive) drawSummaryCanvas();
+            if (segmentationByParticipant.size > 0) drawBoundaryVisuals();
+        };
+        window.onkeydown = (e) => { if (e.code === "Space") { e.preventDefault(); togglePlay(); } };
+        window.onresize = () => {
+            drawRatingCanvas();
+            if (summaryActive) drawSummaryCanvas();
+            if (segmentationByParticipant.size > 0) drawBoundaryVisuals();
+            if (iscResults.length > 0) {
+                const validX = iscResults.map(r => r.rX).filter(v => !isNaN(v));
+                const validY = iscResults.map(r => r.rY).filter(v => !isNaN(v));
+                const mean = values => values.length ? values.reduce((a, b) => a + b, 0) / values.length : NaN;
+                drawISCHistogram('iscHistX', validX, mean(validX), xName);
+                if (yAxisEnabled) drawISCHistogram('iscHistY', validY, mean(validY), yName);
+            }
+        };
+
+        function exportGroupData() {
+            if (groupRatingData.length > 0) {
+                let ratCsv = `data:text/csv;charset=utf-8-sig,ms,${xName},${yAxisEnabled ? yName : ''}\n`;
+                groupRatingData.forEach(d => {
+                    ratCsv += yAxisEnabled ? `${d.ms},${d.v.toFixed(3)},${d.a.toFixed(3)}\n` : `${d.ms},${d.v.toFixed(3)}\n`;
+                });
+                const l1 = document.createElement("a");
+                l1.href = encodeURI(ratCsv);
+                l1.download = `GroupMean_Rating.csv`;
+                l1.click();
+            }
+            if (iscResults.length > 0) {
+                let iscCsv = `data:text/csv;charset=utf-8-sig,Participant,ISC_${xName}${yAxisEnabled ? ',ISC_' + yName : ''}\n`;
+                iscResults.forEach(r => {
+                    iscCsv += `${r.pid},${isNaN(r.rX) ? '' : r.rX.toFixed(4)}`;
+                    if (yAxisEnabled) iscCsv += `,${isNaN(r.rY) ? '' : r.rY.toFixed(4)}`;
+                    iscCsv += '\n';
+                });
+                setTimeout(() => {
+                    const l2 = document.createElement("a");
+                    l2.href = encodeURI(iscCsv);
+                    l2.download = `ISC_Results.csv`;
+                    l2.click();
+                }, 300);
+            }
+            setTimeout(() => { window.location.href = '/'; }, 900);
+        }
+
+        window.onload = async () => {
+            setLegends();
+            await Promise.allSettled([loadVideos(), loadDataFolders()]);
+            onLoadModeChange();
+            onDataFolderChange();
+        };
+    </script>
+</body>
+</html>

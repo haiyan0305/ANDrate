@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>ANDrate | Eye Tracking Calibration</title>
+    <script src="/precision_calculation.js"></script>
+    <script src="/webgazer.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --accent: #0071E3;
+            --dot: #FF3B30;
+            --success: #34C759;
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg); color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro", sans-serif;
+            overflow: hidden;
+        }
+
+        /* 校准进度条 */
+        #top-progress-bar {
+            position: absolute; top: 0; left: 0; width: 100%; height: 70px;
+            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 1px solid #333; z-index: 5000;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .progress-instruction { font-size: 15px; font-weight: 500; margin-bottom: 8px; color: #E5E5E7; }
+        .progress-track { width: 80%; max-width: 600px; height: 6px; background: #333; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+        /* 底部状态栏 */
+        #single-line-terminal {
+            position: fixed; bottom: 0; width: 100%; height: 32px;
+            background: #000; border-top: 1px solid #222;
+            padding: 0 15px; box-sizing: border-box;
+            line-height: 32px; font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 12px; color: #888; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; z-index: 5000;
+        }
+
+        /* 通用按钮样式 */
+        .btn-ui {
+            background: var(--accent); color: #fff; border: none;
+            padding: 16px 45px; border-radius: 12px; font-size: 16px;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+            z-index: 5000; position: relative;
+        }
+        .btn-ui:hover { transform: scale(0.98); opacity: 0.9; }
+        
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--dot); }
+
+        /* 校准点 */
+        #calibration-dot {
+            position: absolute; width: 28px; height: 28px;
+            background: var(--dot); border-radius: 50%;
+            border: 4px solid #fff; box-shadow: 0 0 15px var(--dot);
+            display: none; cursor: crosshair; z-index: 2000;
+            transform: translate(-50%, -50%); transition: left 0.3s ease, top 0.3s ease;
+        }
+        #calibration-dot span {
+            position: absolute; width: 100%; text-align: center;
+            top: -25px; left: 0; font-size: 12px; font-weight: bold; color: var(--dot);
+        }
+
+        /* 居中的通用弹窗 */
+        .modal-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.95); backdrop-filter: blur(20px);
+            border: 1px solid #333; border-radius: 20px; padding: 40px;
+            text-align: center; z-index: 6000; display: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5); min-width: 300px;
+        }
+
+        #precision-value { font-size: 72px; font-weight: 700; display: block; margin: 20px 0; }
+
+        /* 验证阶段的中心注视点 */
+        #validation-dot {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 40px; background: var(--accent); border-radius: 50%;
+            border: 4px solid #fff; box-shadow: 0 0 30px var(--accent);
+            display: none; z-index: 3000; animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        #webgazerVideoContainer {
+            position: fixed !important; top: 50% !important; left: 50% !important;
+            transform: translate(-50%, -50%) !important; z-index: 1 !important;
+            opacity: 0.6 !important; pointer-events: none !important;
+            border-radius: 16px; overflow: hidden; border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+<div id="top-progress-bar">
+    <div class="progress-instruction" id="progress-text">Initializing Engine...</div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<main id="stage" style="height: 100%; display: flex; align-items: center; justify-content: center;">
+    <div id="welcome-box">
+        <h2 style="font-weight: 500; margin-bottom: 30px; text-align: center;">Eye Tracking Calibration</h2>
+        <button class="btn-ui" id="start-btn">Activate Calibration Engine</button>
+    </div>
+
+    <div id="calibration-dot"><span id="click-count">5</span></div>
+
+    <button class="btn-ui btn-success" id="return-btn" style="display: none;" onclick="window.location.href='/'">Return to Setup</button>
+</main>
+
+<!-- 准备进入验证阶段 -->
+<div id="modal-ready" class="modal-panel">
+    <h3>Points Recorded</h3>
+    <p style="color: #888;">Calibration phase complete. Ready to measure precision?</p>
+    <button class="btn-ui" id="btn-go-validation">Start Validation</button>
+</div>
+
+<!-- 显示验证结果 -->
+<div id="modal-result" class="modal-panel">
+    <h2>Tracking Precision</h2>
+    <span id="precision-value">--%</span>
+    <p id="result-hint" style="color:#BBBBBB; margin-top: 0;"></p>
+    <div style="margin-top: 30px;">
+        <button class="btn-ui btn-danger" id="btn-recalibrate" style="margin-right: 10px;">Recalibrate</button>
+        <button class="btn-ui btn-success" id="btn-accept">Accept & Continue</button>
+    </div>
+</div>
+
+<!-- 验证阶段辅助元素 -->
+<div id="validation-dot"></div>
+<div id="validation-timer" style="position: fixed; top: calc(50% + 60px); left: 50%; transform: translateX(-50%); font-size: 24px; display: none;">5</div>
+
+<div id="single-line-terminal">
+    <span style="color: var(--accent); font-weight: bold;">[SYSTEM]</span> <span id="log-text">Waiting...</span>
+</div>
+
+<div id="gaze-cursor" style="position: fixed; width: 16px; height: 16px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; z-index: 9999; display: none; transform: translate(-50%, -50%);"></div>
+
+<script src="/static/calibration_core.js"></script>
+</body>
+</html>

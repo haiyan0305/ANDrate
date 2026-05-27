@@ -17,12 +17,12 @@ Start,End,Label
 149000,173000,Coconuts picked by the monkey falling to the ground
 173000,184000,The monkey climbing down the tree
 184000,195000,The monkey transporting coconuts
-195000,206000,猴子搬椰子到树荫底下
-206000,219000,猴子喝白色的水
-219000,238000,猴子在野外
-238000,247000,一个猴子翻垃圾桶
-247000,262000,更多的猴子来了
-262000,282000,猴子们一起吃垃圾
-282000,300000,猴子找到新的桶但是打不开
-300000,320000,猴子找到了打开桶的方法
-320000,337000,猴子拉线吃毛毛虫
+195000,206000,Monkeys carry coconuts to the shade of a tree.
+206000,219000,Monkeys drink white water.
+219000,238000,Monkeys are in the wild.
+238000,247000,A monkey rummages through a trash can.
+247000,262000,More monkeys arrive.
+262000,282000,The monkeys eat the trash together.
+282000,300000,A monkey finds a new can but can't open it.
+300000,320000,The monkeys find a way to open the can.
+320000,337000,A monkey pulls a string to eat a caterpillar.

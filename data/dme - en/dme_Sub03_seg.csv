@@ -1,0 +1,10 @@
+﻿Start,End,Label
+0,22000,Going to bed
+22000,46000,Asking for a bedtime story
+46000,167000,Telling a bedtime story
+167000,213000,"Story ends, falling asleep"
+213000,277000,"Conversation, rocket about to launch"
+277000,387000,Sending the girls off after breakfast
+387000,438000,After sending the girls off
+438000,533000,"Arriving at the factory, preparing for rocket launch"
+533000,600000,Launching the rocket
